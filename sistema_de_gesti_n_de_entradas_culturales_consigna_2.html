@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TP Integrador - Consigna 2: Venta de Entradas Culturales</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- SQLite en WebAssembly (sql.js) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- ========================================================================= -->
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+  <!-- ========================================================================= -->
+  <header class="bg-slate-800/90 border-b border-slate-700/80 sticky top-0 z-40 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-600/30 border border-indigo-500/40 p-2 rounded-xl text-indigo-400">
+          <i data-lucide="ticket" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base md:text-lg text-white">Sistema de Entradas Culturales</h1>
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              Consigna 2 POO
+            </span>
+            <span id="sqlite-badge" class="text-[10px] font-mono-code px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600">
+              Iniciando SQLite...
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Excepciones personalizadas, Clases Abstractas, Interfaces y Base de Datos SQLite</p>
+        </div>
+      </div>
+
+      <!-- Pestañas de navegación -->
+      <nav class="flex items-center gap-2">
+        <button onclick="cambiarPestana('simulador')" id="btn-tab-simulador" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all bg-indigo-600 text-white shadow-sm flex items-center gap-1.5">
+          <i data-lucide="terminal" class="w-4 h-4"></i> Simulador y Pruebas
+        </button>
+        <button onclick="cambiarPestana('basedatos')" id="btn-tab-basedatos" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center gap-1.5">
+          <i data-lucide="database" class="w-4 h-4"></i> Base de Datos SQLite
+        </button>
+        <button onclick="cambiarPestana('uml')" id="btn-tab-uml" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center gap-1.5">
+          <i data-lucide="network" class="w-4 h-4"></i> Diagramas UML
+        </button>
+        <button onclick="reiniciarBaseDatos()" title="Reiniciar BD y datos iniciales" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-700/60 rounded-lg transition-all ml-1">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- CUERPO PRINCIPAL -->
+  <!-- ========================================================================= -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- Tarjetas de Conceptos Clave Evaluados en Consigna 2 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+      <div class="bg-slate-800/60 border border-slate-700/70 p-3.5 rounded-xl flex items-start gap-3">
+        <div class="bg-rose-500/20 text-rose-400 p-2 rounded-lg shrink-0">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-rose-300">1. Excepciones Personalizadas</h2>
+          <p class="text-xs text-slate-300 mt-0.5"><code class="text-rose-200 bg-rose-950/60 px-1 py-0.5 rounded font-mono-code">EntradaInvalidaError</code> y <code class="text-rose-200 bg-rose-950/60 px-1 py-0.5 rounded font-mono-code">DatoInvalidoError</code> lanzadas con <span class="text-amber-300 font-mono-code">raise</span>.</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/70 p-3.5 rounded-xl flex items-start gap-3">
+        <div class="bg-indigo-500/20 text-indigo-400 p-2 rounded-lg shrink-0">
+          <i data-lucide="layers" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-indigo-300">2. Clase Abstracta</h2>
+          <p class="text-xs text-slate-300 mt-0.5"><code class="text-indigo-200 bg-indigo-950/60 px-1 py-0.5 rounded font-mono-code">EventoBase(ABC)</code> con método abstracto <code class="text-indigo-200 bg-indigo-950/60 px-1 py-0.5 rounded font-mono-code">calcular_precio_final()</code>.</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/70 p-3.5 rounded-xl flex items-start gap-3">
+        <div class="bg-emerald-500/20 text-emerald-400 p-2 rounded-lg shrink-0">
+          <i data-lucide="file-check-2" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-emerald-300">3. Interfaz Pura</h2>
+          <p class="text-xs text-slate-300 mt-0.5"><code class="text-emerald-200 bg-emerald-950/60 px-1 py-0.5 rounded font-mono-code">Reportable</code> obliga a implementar <code class="text-emerald-200 bg-emerald-950/60 px-1 py-0.5 rounded font-mono-code">generar_resumen()</code> en Eventos y Entradas.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- SECCIÓN 1: SIMULADOR Y CONSOLA INTERACTIVA -->
+    <!-- ======================================================================= -->
+    <div id="vista-simulador" class="space-y-6">
+
+      <!-- Botones de Demostración Rápida (1 Clic) -->
+      <section class="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 sm:p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div>
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+              Pruebas Rápidas de la Consigna 2 (Para la Presentación)
+            </h3>
+            <p class="text-xs text-slate-400">Ejecuta en un clic cada uno de los casos exigidos por la pauta docente.</p>
+          </div>
+          <span class="text-xs text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-800 font-mono-code">
+            try / except activo
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- Prueba 1: Feliz -->
+          <button onclick="ejecutarPruebaDocente('feliz')" class="group text-left p-3 rounded-xl bg-slate-900/80 hover:bg-emerald-950/30 border border-slate-700 hover:border-emerald-500/50 transition-all">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-emerald-400">1. Camino Feliz</span>
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform"></i>
+            </div>
+            <p class="text-xs text-slate-300">Venta válida en Evento VIP con cálculo polimórfico (+25%).</p>
+          </button>
+
+          <!-- Prueba 2: Dato Inválido -->
+          <button onclick="ejecutarPruebaDocente('precio_negativo')" class="group text-left p-3 rounded-xl bg-slate-900/80 hover:bg-rose-950/30 border border-slate-700 hover:border-rose-500/50 transition-all">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-rose-400">2. DatoInvalidoError</span>
+              <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform"></i>
+            </div>
+            <p class="text-xs text-slate-300">Precio negativo ($ -500). El método lanza la excepción con <code class="text-rose-300">raise</code>.</p>
+          </button>
+
+          <!-- Prueba 3: Sin Cupo -->
+          <button onclick="ejecutarPruebaDocente('sin_cupo')" class="group text-left p-3 rounded-xl bg-slate-900/80 hover:bg-amber-950/30 border border-slate-700 hover:border-amber-500/50 transition-all">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-amber-400">3. EntradaInvalidaError</span>
+              <i data-lucide="ban" class="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform"></i>
+            </div>
+            <p class="text-xs text-slate-300">Evento agotado. Se verifica la regla de negocio sin crashear.</p>
+          </button>
+
+          <!-- Prueba 4: Abstracta -->
+          <button onclick="ejecutarPruebaDocente('abstracta')" class="group text-left p-3 rounded-xl bg-slate-900/80 hover:bg-indigo-950/30 border border-slate-700 hover:border-indigo-500/50 transition-all">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-indigo-400">4. Clase Abstracta</span>
+              <i data-lucide="shield-alert" class="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform"></i>
+            </div>
+            <p class="text-xs text-slate-300">Intento de instanciar <code class="text-indigo-300">EventoBase</code> directo (captura TypeError).</p>
+          </button>
+        </div>
+      </section>
+
+      <!-- Panel Dividido: Formulario vs Consola -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Formulario Operación Principal -->
+        <div class="lg:col-span-5 bg-slate-800/70 border border-slate-700 rounded-2xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-700">
+              <div class="flex items-center gap-2">
+                <i data-lucide="shopping-bag" class="w-5 h-5 text-indigo-400"></i>
+                <h3 class="font-semibold text-white text-base">Operación Principal: vender_entrada()</h3>
+              </div>
+              <span class="text-xs px-2 py-0.5 bg-slate-900 text-slate-400 rounded border border-slate-700 font-mono-code">Método de Evento</span>
+            </div>
+
+            <form id="form-venta" onsubmit="enviarVentaFormulario(event)" class="space-y-4">
+              <!-- Selector de Evento -->
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1 flex justify-between">
+                  <span>Evento Cultural:</span>
+                  <span id="badge-cupo-formulario" class="font-mono-code text-slate-400">Cupo: -</span>
+                </label>
+                <select id="select-evento" onchange="alCambiarEventoSeleccionado()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                  <!-- Llenado por JS -->
+                </select>
+                <div id="hint-polimorfismo" class="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
+                  <i data-lucide="info" class="w-3.5 h-3.5 text-indigo-400"></i>
+                  <span>Subclase seleccionada: cargando...</span>
+                </div>
+              </div>
+
+              <!-- Selector de Cliente -->
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">
+                  Cliente Titular:
+                </label>
+                <select id="select-cliente" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                  <!-- Llenado por JS -->
+                </select>
+              </div>
+
+              <!-- Input de Precio Base -->
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1 flex justify-between">
+                  <span>Precio Base ($):</span>
+                  <span class="text-[11px] text-slate-400">Permite negativos para probar excepción</span>
+                </label>
+                <div class="relative rounded-xl">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-sm">$</span>
+                  <input type="number" id="input-precio-base" value="4000" step="100" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono-code transition-all" required>
+                </div>
+              </div>
+
+              <!-- Vista previa polimórfica del precio final -->
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-700/80 text-xs flex justify-between items-center">
+                <span class="text-slate-400">Precio Final Polimórfico (<code class="text-indigo-300 font-mono-code">calcular_precio_final</code>):</span>
+                <span id="preview-precio-calculado" class="font-bold text-sm text-emerald-400 font-mono-code">$4,000.00</span>
+              </div>
+
+              <button type="submit" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                Ejecutar Venta con try / except
+              </button>
+            </form>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-700/70 text-[11px] text-slate-400 flex items-center justify-between">
+            <span>TP Integrador - Consigna 2</span>
+            <span class="text-indigo-400 font-medium">UADE / Universidad</span>
+          </div>
+        </div>
+
+        <!-- Consola Python Simulada en Tiempo Real -->
+        <div class="lg:col-span-7 bg-slate-950 border border-slate-800 rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+          <!-- Barra superior de la consola -->
+          <div class="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-rose-500/80"></div>
+              <div class="w-3 h-3 rounded-full bg-amber-500/80"></div>
+              <div class="w-3 h-3 rounded-full bg-emerald-500/80"></div>
+              <span class="ml-2 text-xs font-mono-code text-slate-400 flex items-center gap-1.5">
+                <i data-lucide="terminal" class="w-3.5 h-3.5 text-indigo-400"></i>
+                python -u consigna2.py
+              </span>
+            </div>
+            <button onclick="limpiarPantallaConsola()" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-800 transition-all font-mono-code flex items-center gap-1">
+              <i data-lucide="trash-2" class="w-3 h-3"></i> Limpiar
+            </button>
+          </div>
+
+          <!-- Salida de texto tipo terminal -->
+          <div id="consola-salida" class="p-4 flex-1 font-mono-code text-xs overflow-y-auto space-y-2 text-slate-300 min-h-[380px] max-h-[480px]">
+            <div class="text-slate-500">// Entorno de ejecución listo con SQLite en memoria.</div>
+            <div class="text-slate-400">SISTEMA INICIALIZADO: Clases cargadas (EventoBase, EventoEstandar, EventoVIP, Reportable).</div>
+          </div>
+
+          <!-- Pie de estado de la consola -->
+          <div class="bg-slate-900/90 border-t border-slate-800 px-4 py-2 flex items-center justify-between text-[11px] font-mono-code text-slate-400">
+            <div class="flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Intérprete Python Simulado</span>
+            </div>
+            <span id="consola-ultimo-estado" class="text-slate-500">Esperando ejecución...</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Resúmenes Generados Mediante la Interfaz Reportable -->
+      <section class="bg-slate-800/70 border border-slate-700 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+              <i data-lucide="file-text" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="font-semibold text-white text-sm">Contrato de Interfaz: generar_resumen()</h3>
+              <p class="text-xs text-slate-400">Objetos del sistema que implementan la interfaz pura <code class="text-emerald-300 font-mono-code">Reportable</code>.</p>
+            </div>
+          </div>
+          <button onclick="renderizarReportables()" class="text-xs px-3 py-1.5 bg-slate-900 text-slate-300 hover:text-white rounded-lg border border-slate-700 flex items-center gap-1.5 transition-all">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Refrescar
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="contenedor-reportables">
+          <!-- Llenado por JS -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- SECCIÓN 2: BASE DE DATOS SQLITE EN MEMORIA -->
+    <!-- ======================================================================= -->
+    <div id="vista-basedatos" class="space-y-6 hidden">
+
+      <div class="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 class="text-base font-semibold text-white flex items-center gap-2">
+            <i data-lucide="database" class="w-5 h-5 text-indigo-400"></i>
+            Base de Datos SQLite (sql.js en Memoria WebAssembly)
+          </h3>
+          <p class="text-xs text-slate-400">
+            Tablas relacionales: <code class="text-indigo-300 font-mono-code">eventos</code> (1) ─── (*) <code class="text-emerald-300 font-mono-code">entradas</code> (*) ─── (1) <code class="text-amber-300 font-mono-code">clientes</code>.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="descargarBaseDatosSQLite()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar Archivo .sqlite
+          </button>
+        </div>
+      </div>
+
+      <!-- Consola Interactiva SQL para consultas en vivo -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-semibold text-slate-300 font-mono-code flex items-center gap-2">
+            <i data-lucide="code" class="w-4 h-4 text-indigo-400"></i> Ejecutar Consulta SQL en Vivo:
+          </label>
+          <div class="flex gap-2">
+            <button onclick="ejecutarSqlRapido('SELECT * FROM eventos')" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-code">
+              SELECT eventos
+            </button>
+            <button onclick="ejecutarSqlRapido('SELECT * FROM entradas')" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-code">
+              SELECT entradas
+            </button>
+            <button onclick="ejecutarSqlRapido('SELECT e.numero, ev.nombre AS evento, c.nombre AS cliente, e.precio_final FROM entradas e JOIN eventos ev ON e.id_evento = ev.id_evento JOIN clientes c ON e.id_cliente = c.id_cliente')" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-code">
+              JOIN Completo
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <input type="text" id="input-sql" value="SELECT * FROM eventos;" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono-code text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <button onclick="ejecutarConsultaSqlManual()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl font-mono-code flex items-center gap-1.5 transition-all">
+            <i data-lucide="play" class="w-3.5 h-3.5"></i> Ejecutar SQL
+          </button>
+        </div>
+
+        <!-- Resultado de la consulta SQL libre -->
+        <div id="resultado-sql-libre" class="hidden overflow-x-auto p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-xs font-mono-code text-slate-300">
+          <!-- Renderizado dinámicamente -->
+        </div>
+      </div>
+
+      <!-- Tabla 1: EVENTOS -->
+      <div class="bg-slate-800/70 border border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+        <div class="px-5 py-3.5 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono-code">TABLA: eventos</span>
+            <span class="text-xs text-slate-400">(Herencia de EventoBase)</span>
+          </div>
+          <span id="badge-total-eventos" class="text-xs text-slate-400 font-mono-code">Cargando...</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase font-semibold text-[10px] text-slate-400 tracking-wider border-b border-slate-700/80">
+              <tr>
+                <th class="py-2.5 px-4 font-mono-code">id_evento</th>
+                <th class="py-2.5 px-4 font-mono-code">nombre</th>
+                <th class="py-2.5 px-4 font-mono-code">tipo_subclase</th>
+                <th class="py-2.5 px-4 font-mono-code">sala</th>
+                <th class="py-2.5 px-4 font-mono-code">cupo_maximo</th>
+                <th class="py-2.5 px-4 font-mono-code">vendidas</th>
+                <th class="py-2.5 px-4 font-mono-code">estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-eventos" class="divide-y divide-slate-700/60 font-mono-code">
+              <!-- Llenado por JS desde SQLite -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tabla 2: CLIENTES -->
+      <div class="bg-slate-800/70 border border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+        <div class="px-5 py-3.5 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono-code">TABLA: clientes</span>
+            <span class="text-xs text-slate-400">(Implementa IDetallable)</span>
+          </div>
+          <span id="badge-total-clientes" class="text-xs text-slate-400 font-mono-code">Cargando...</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase font-semibold text-[10px] text-slate-400 tracking-wider border-b border-slate-700/80">
+              <tr>
+                <th class="py-2.5 px-4 font-mono-code">id_cliente</th>
+                <th class="py-2.5 px-4 font-mono-code">nombre</th>
+                <th class="py-2.5 px-4 font-mono-code">email</th>
+                <th class="py-2.5 px-4 font-mono-code">tipo_cliente</th>
+                <th class="py-2.5 px-4 font-mono-code">nro_abono</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-clientes" class="divide-y divide-slate-700/60 font-mono-code">
+              <!-- Llenado por JS desde SQLite -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tabla 3: ENTRADAS -->
+      <div class="bg-slate-800/70 border border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+        <div class="px-5 py-3.5 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono-code">TABLA: entradas</span>
+            <span class="text-xs text-slate-400">(Relaciona Evento y Cliente)</span>
+          </div>
+          <span id="badge-total-entradas" class="text-xs text-slate-400 font-mono-code">Cargando...</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase font-semibold text-[10px] text-slate-400 tracking-wider border-b border-slate-700/80">
+              <tr>
+                <th class="py-2.5 px-4 font-mono-code">numero</th>
+                <th class="py-2.5 px-4 font-mono-code">id_evento (FK)</th>
+                <th class="py-2.5 px-4 font-mono-code">id_cliente (FK)</th>
+                <th class="py-2.5 px-4 font-mono-code">precio_final</th>
+                <th class="py-2.5 px-4 font-mono-code">estado</th>
+                <th class="py-2.5 px-4 font-mono-code">fecha_emision</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-entradas" class="divide-y divide-slate-700/60 font-mono-code">
+              <!-- Llenado por JS desde SQLite -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- SECCIÓN 3: DIAGRAMAS UML Y GUION DE DEFENSA -->
+    <!-- ======================================================================= -->
+    <div id="vista-uml" class="space-y-6 hidden">
+
+      <div class="bg-slate-800/70 border border-slate-700 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 class="text-base font-semibold text-white flex items-center gap-2">
+            <i data-lucide="network" class="w-5 h-5 text-indigo-400"></i>
+            Diagramas UML Oficiales - Consigna 2
+          </h3>
+          <p class="text-xs text-slate-400">
+            Documentación visual solicitada en la consigna, incluyendo el fragmento <code class="text-indigo-300 font-mono-code">alt</code> de caminos alternativos.
+          </p>
+        </div>
+        <button onclick="copiarCodigoPlantUmlActual()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar Código PlantUML
+        </button>
+      </div>
+
+      <!-- Selector de Diagramas -->
+      <div class="flex gap-2 border-b border-slate-700/80 pb-2">
+        <button onclick="seleccionarDiagrama('secuencia')" id="btn-subdiag-secuencia" class="diag-sub-btn px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-indigo-600 text-white">
+          1. Diagrama de Secuencia (con bloque 'alt')
+        </button>
+        <button onclick="seleccionarDiagrama('clases')" id="btn-subdiag-clases" class="diag-sub-btn px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-slate-800 text-slate-400 hover:text-white">
+          2. Diagrama de Clases
+        </button>
+        <button onclick="seleccionarDiagrama('casos_uso')" id="btn-subdiag-casos_uso" class="diag-sub-btn px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-slate-800 text-slate-400 hover:text-white">
+          3. Casos de Uso
+        </button>
+      </div>
+
+      <!-- Vistas de los diagramas -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 overflow-hidden">
+        
+        <!-- DIAGRAMA DE SECUENCIA CON FRAGMENTO ALT -->
+        <div id="subdiag-secuencia" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-semibold text-indigo-300 flex items-center gap-2">
+              <i data-lucide="git-branch" class="w-4 h-4"></i> Secuencia: Operación Principal vender_entrada()
+            </h4>
+            <span class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-md border border-slate-700">Requerimiento Excluyente</span>
+          </div>
+
+          <!-- Gráfico visual SVG/HTML interactivo -->
+          <div class="p-4 bg-slate-950 rounded-xl border border-slate-800/80 overflow-x-auto text-xs font-mono-code text-slate-300">
+            <div class="min-w-[700px] space-y-4">
+              <!-- Participantes -->
+              <div class="grid grid-cols-4 text-center font-bold pb-4 border-b border-slate-800 text-slate-200">
+                <div class="bg-slate-800 py-1.5 px-3 rounded-lg border border-slate-700 mx-2">:Cliente (Actor)</div>
+                <div class="bg-indigo-900/60 py-1.5 px-3 rounded-lg border border-indigo-700 mx-2">:EventoBase</div>
+                <div class="bg-slate-800 py-1.5 px-3 rounded-lg border border-slate-700 mx-2">:EventoConcreto (VIP/Std)</div>
+                <div class="bg-emerald-950/60 py-1.5 px-3 rounded-lg border border-emerald-700 mx-2">:Entrada</div>
+              </div>
+
+              <!-- Mensaje inicial -->
+              <div class="flex items-center text-indigo-400 py-1">
+                <span class="w-1/4 text-center font-semibold">1. vender_entrada(cliente, precio) ───────────►</span>
+                <span class="w-1/4 text-center text-slate-400">(recibe el llamado)</span>
+              </div>
+
+              <!-- Bloque ALT -->
+              <div class="border-2 border-dashed border-rose-500/60 rounded-xl p-3 bg-rose-950/10 space-y-3">
+                <div class="flex items-center justify-between text-rose-400 font-bold border-b border-rose-500/30 pb-1">
+                  <span>[alt] CAMINO ALTERNATIVO 1: precio_base &lt;= 0</span>
+                  <span class="text-[10px] uppercase bg-rose-950 px-2 py-0.5 rounded border border-rose-800">raise DatoInvalidoError</span>
+                </div>
+                <div class="text-rose-300 pl-4">
+                  ◄ - - - - - - - - throw DatoInvalidoError("Precio debe ser mayor a 0") - - - - - - - -
+                </div>
+
+                <div class="flex items-center justify-between text-amber-400 font-bold border-t border-dashed border-amber-500/40 pt-2 border-b pb-1">
+                  <span>[alt] CAMINO ALTERNATIVO 2: NOT tiene_cupo_disponible()</span>
+                  <span class="text-[10px] uppercase bg-amber-950 px-2 py-0.5 rounded border border-amber-800">raise EntradaInvalidaError</span>
+                </div>
+                <div class="text-amber-300 pl-4">
+                  ◄ - - - - - - - - throw EntradaInvalidaError("No hay cupo disponible") - - - - - - - -
+                </div>
+
+                <div class="flex items-center justify-between text-emerald-400 font-bold border-t border-dashed border-emerald-500/40 pt-2 border-b pb-1">
+                  <span>[else] CAMINO FELIZ: Datos válidos y Cupo disponible</span>
+                  <span class="text-[10px] uppercase bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">Flujo Exitoso</span>
+                </div>
+                <div class="text-slate-300 pl-4 space-y-2">
+                  <p>EventoBase ────────► EventoConcreto: calcular_precio_final(precio_base)</p>
+                  <p>EventoBase ◄ - - - - EventoConcreto: precio_final (polimórfico)</p>
+                  <p>EventoBase ────────► Entrada: new(numero, self, cliente, precio_final)</p>
+                  <p class="text-emerald-400">Cliente ◄ - - - - - - - - return instancia_entrada - - - - - - - -</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700 text-xs space-y-1.5">
+            <span class="font-semibold text-white">Guion para defender este diagrama frente al docente:</span>
+            <p class="text-slate-300">
+              «El diagrama de secuencia modela la operación <code class="font-mono-code text-indigo-300">vender_entrada()</code>. Utilizamos el fragmento <strong>alt</strong> exigido por la Consigna 2 para representar los caminos excluyentes: cuando el dato es erróneo o se agota el cupo, el método lanza inmediatamente la excepción con <code class="font-mono-code text-rose-300">raise</code> hacia el cliente, impidiendo la creación del ticket. En la rama <strong>else</strong> se ejecuta el camino feliz, donde se delega polimórficamente el cálculo del precio a la subclase y se crea la Entrada».
+            </p>
+          </div>
+        </div>
+
+        <!-- DIAGRAMA DE CLASES -->
+        <div id="subdiag-clases" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-semibold text-indigo-300 flex items-center gap-2">
+              <i data-lucide="box" class="w-4 h-4"></i> Diagrama de Clases (Consigna 2)
+            </h4>
+            <span class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-md border border-slate-700">Abstracción + Interfaz</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono-code">
+            <!-- Interfaz Reportable -->
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-emerald-500/40">
+              <div class="text-emerald-400 text-center font-bold border-b border-slate-800 pb-2">
+                &lt;&lt;interface&gt;&gt;<br>Reportable
+              </div>
+              <div class="py-2 text-slate-400 text-center italic">
+                (Interfaz pura sin estado)
+              </div>
+              <div class="border-t border-slate-800 pt-2 text-emerald-300">
+                + {abstract} generar_resumen(): str
+              </div>
+            </div>
+
+            <!-- Clase Abstracta EventoBase -->
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-indigo-500/50">
+              <div class="text-indigo-400 text-center font-bold border-b border-slate-800 pb-2">
+                {abstract}<br>EventoBase (implements Reportable)
+              </div>
+              <div class="py-2 text-slate-300 space-y-0.5 border-b border-slate-800">
+                <div>+ id_evento: int</div>
+                <div>+ nombre: str</div>
+                <div>+ sala: str</div>
+                <div>+ cupo_maximo: int</div>
+                <div>+ entradas_vendidas: list</div>
+              </div>
+              <div class="pt-2 text-indigo-200 space-y-0.5">
+                <div>+ {abstract} calcular_precio_final(): float</div>
+                <div>+ tiene_cupo_disponible(): bool</div>
+                <div>+ vender_entrada(): Entrada</div>
+                <div>+ generar_resumen(): str</div>
+              </div>
+            </div>
+
+            <!-- Subclases Concretas -->
+            <div class="space-y-3">
+              <div class="bg-slate-950 p-3 rounded-xl border border-slate-700">
+                <div class="text-slate-200 font-bold border-b border-slate-800 pb-1">EventoEstandar</div>
+                <div class="pt-1.5 text-slate-300">+ calcular_precio_final() [tarifa plana]</div>
+              </div>
+              <div class="bg-slate-950 p-3 rounded-xl border border-amber-500/40">
+                <div class="text-amber-300 font-bold border-b border-slate-800 pb-1">EventoVIP</div>
+                <div class="pt-1.5 text-slate-300">+ calcular_precio_final() [+25% recargo]</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700 text-xs space-y-1.5">
+            <span class="font-semibold text-white">Guion para defender el diagrama de clases:</span>
+            <p class="text-slate-300">
+              «<code class="font-mono-code text-indigo-300">EventoBase</code> hereda del módulo <code class="font-mono-code">abc.ABC</code> de Python e implementa el contrato de la interfaz pura <code class="font-mono-code text-emerald-300">Reportable</code>. Al poseer el método abstracto <code class="font-mono-code text-indigo-300">calcular_precio_final()</code>, no puede instanciarse directamente. Sus clases hijas <code class="font-mono-code">EventoEstandar</code> y <code class="font-mono-code">EventoVIP</code> implementan su propia lógica de precios de forma polimórfica».
+            </p>
+          </div>
+        </div>
+
+        <!-- CASOS DE USO -->
+        <div id="subdiag-casos_uso" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-semibold text-indigo-300 flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4"></i> Diagrama de Casos de Uso del Sistema
+            </h4>
+            <span class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-md border border-slate-700">Interacción de Actores</span>
+          </div>
+
+          <div class="p-6 bg-slate-950 rounded-xl border border-slate-800 flex flex-col md:flex-row items-center justify-around gap-6">
+            <div class="text-center p-4 bg-slate-900 border border-slate-700 rounded-2xl w-44">
+              <i data-lucide="user" class="w-10 h-10 text-indigo-400 mx-auto mb-1"></i>
+              <span class="font-bold text-sm text-white">Actor: Cliente / Operador</span>
+              <p class="text-[11px] text-slate-400 mt-1">Inicia la solicitud de compra</p>
+            </div>
+
+            <div class="space-y-3 w-full max-w-md font-mono-code">
+              <div class="p-3 bg-slate-900/90 border border-indigo-500/40 rounded-xl text-center font-medium text-xs text-indigo-200">
+                ( CU-01: Comprar Entrada Estándar )
+              </div>
+              <div class="p-3 bg-slate-900/90 border border-amber-500/40 rounded-xl text-center font-medium text-xs text-amber-200">
+                ( CU-02: Comprar Entrada VIP con Beneficios )
+              </div>
+              <div class="p-3 bg-slate-900/90 border border-emerald-500/40 rounded-xl text-center font-medium text-xs text-emerald-200">
+                ( CU-03: Generar Resumen Reportable )
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL DE NOTIFICACIONES (Reemplazo de alert()) -->
+  <!-- ========================================================================= -->
+  <div id="modal-notificacion" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-center gap-3">
+        <div id="modal-icono-caja" class="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+          <i id="modal-icono" data-lucide="info" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h3 id="modal-titulo" class="font-semibold text-white text-base">Título de Notificación</h3>
+          <p id="modal-subtitulo" class="text-xs text-slate-400">Detalle del estado</p>
+        </div>
+      </div>
+      <div id="modal-cuerpo" class="text-xs text-slate-300 font-mono-code bg-slate-950 p-3 rounded-xl border border-slate-800 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">
+        Contenido del mensaje.
+      </div>
+      <div class="flex justify-end pt-2">
+        <button onclick="cerrarModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-all">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- LÓGICA INTEGRADA (JAVASCRIPT + SQLITE EN MEMORIA) -->
+  <!-- ========================================================================= -->
+  <script>
+    // =========================================================================
+    // 1. CLASES DE EXCEPCIONES PERSONALIZADAS (Consigna 2)
+    // =========================================================================
+    class EntradaInvalidaError extends Error {
+      constructor(mensaje) {
+        super(mensaje);
+        this.name = "EntradaInvalidaError";
+      }
+    }
+
+    class DatoInvalidoError extends Error {
+      constructor(mensaje) {
+        super(mensaje);
+        this.name = "DatoInvalidoError";
+      }
+    }
+
+    // =========================================================================
+    // 2. INTERFAZ Reportable
+    // =========================================================================
+    class Reportable {
+      generar_resumen() {
+        throw new Error("El método abstracto generar_resumen() debe ser implementado.");
+      }
+    }
+
+    // =========================================================================
+    // 3. CLASE ABSTRACTA EventoBase (Simula abc.ABC de Python)
+    // =========================================================================
+    class EventoBase extends Reportable {
+      constructor(id_evento, nombre, sala, cupo_maximo, tipo_subclase = "Abstracta") {
+        super();
+        // Emulación estricta de Python: impedir instanciar EventoBase directamente
+        if (new.target === EventoBase) {
+          throw new TypeError("Can't instantiate abstract class EventoBase without an implementation for abstract method 'calcular_precio_final'");
+        }
+
+        if (!nombre || nombre.trim() === "") {
+          throw new DatoInvalidoError("El nombre del evento no puede estar vacío.");
+        }
+        if (cupo_maximo <= 0) {
+          throw new DatoInvalidoError("El cupo máximo debe ser estrictamente mayor a 0.");
+        }
+
+        this.id_evento = id_evento;
+        this.nombre = nombre;
+        this.sala = sala;
+        this.cupo_maximo = cupo_maximo;
+        this.tipo_subclase = tipo_subclase;
+        this.entradas_vendidas = [];
+      }
+
+      // Método abstracto exigido por la Consigna 2
+      calcular_precio_final(precio_base) {
+        throw new Error("Método abstracto calcular_precio_final() debe ser implementado por la subclase concreta.");
+      }
+
+      tiene_cupo_disponible() {
+        return this.entradas_vendidas.length < this.cupo_maximo;
+      }
+
+      // OPERACIÓN PRINCIPAL DEL SISTEMA (Consigna 2)
+      vender_entrada(cliente, precio_base, nro_ticket) {
+        // Validación 1: Precio base
+        if (precio_base <= 0) {
+          throw new DatoInvalidoError(`El precio base ($${precio_base.toFixed(2)}) no puede ser menor o igual a cero.`);
+        }
+
+        // Validación 2: Cupo disponible
+        if (!this.tiene_cupo_disponible()) {
+          throw new EntradaInvalidaError(`No hay cupo disponible para el evento '${this.nombre}' (Cupo máx: ${this.cupo_maximo}).`);
+        }
+
+        // Llamada polimórfica a la subclase
+        const precio_final = this.calcular_precio_final(precio_base);
+
+        const nuevaEntrada = new Entrada(nro_ticket, this, cliente, precio_final);
+        this.entradas_vendidas.push(nuevaEntrada);
+
+        return nuevaEntrada;
+      }
+
+      // Cumplimiento del contrato de la interfaz Reportable
+      generar_resumen() {
+        const disponibles = this.cupo_maximo - this.entradas_vendidas.length;
+        const total = this.entradas_vendidas.reduce((sum, e) => sum + e.precio, 0);
+        return {
+          tipo: 'Evento',
+          titulo: this.nombre,
+          subtitulo: `Sala: ${this.sala} | Tipo: ${this.tipo_subclase}`,
+          detalles: [
+            `Capacidad Máxima: ${this.cupo_maximo} localidades`,
+            `Entradas Emitidas: ${this.entradas_vendidas.length}`,
+            `Lugares Disponibles: ${disponibles}`,
+            `Recaudación Total: $${total.toFixed(2)}`
+          ],
+          estado: disponibles > 0 ? "DISPONIBLE" : "AGOTADO"
+        };
+      }
+    }
+
+    // =========================================================================
+    // 4. SUBCLASES CONCRETAS
+    // =========================================================================
+    class EventoEstandar extends EventoBase {
+      constructor(id_evento, nombre, sala, cupo_maximo) {
+        super(id_evento, nombre, sala, cupo_maximo, "Estándar");
+      }
+
+      calcular_precio_final(precio_base) {
+        return precio_base; // Sin recargos
+      }
+    }
+
+    class EventoVIP extends EventoBase {
+      constructor(id_evento, nombre, sala, cupo_maximo) {
+        super(id_evento, nombre, sala, cupo_maximo, "VIP");
+      }
+
+      calcular_precio_final(precio_base) {
+        return precio_base * 1.25; // 25% extra por servicio exclusivo
+      }
+    }
+
+    // =========================================================================
+    // 5. CLASE CLIENTE & ENTRADA
+    // =========================================================================
+    class Cliente {
+      constructor(id_cliente, nombre, email, tipo_cliente = "General", nro_abono = null) {
+        if (!nombre || nombre.trim() === "") {
+          throw new DatoInvalidoError("El nombre del cliente no puede estar vacío.");
+        }
+        this.id_cliente = id_cliente;
+        this.nombre = nombre;
+        this.email = email;
+        this.tipo_cliente = tipo_cliente;
+        this.nro_abono = nro_abono;
+      }
+
+      obtener_detalle() {
+        return `[#${this.id_cliente}] ${this.nombre} - ${this.tipo_cliente} ${this.nro_abono ? `(Abono: ${this.nro_abono})` : ''}`;
+      }
+    }
+
+    class Entrada extends Reportable {
+      constructor(numero, evento, cliente, precio) {
+        super();
+        this.numero = numero;
+        this.evento = evento;
+        this.cliente = cliente;
+        this.precio = precio;
+        this.estado = "EMITIDA";
+        this.fecha_emision = new Date().toLocaleTimeString();
+      }
+
+      generar_resumen() {
+        return {
+          tipo: 'Entrada',
+          titulo: `Ticket Oficial N° ${this.numero}`,
+          subtitulo: `Función: ${this.evento.nombre}`,
+          detalles: [
+            `Titular: ${this.cliente.nombre} (${this.cliente.email})`,
+            `Categoría: ${this.evento.tipo_subclase}`,
+            `Importe Pagado: $${this.precio.toFixed(2)}`,
+            `Hora Emisión: ${this.fecha_emision}`
+          ],
+          estado: this.estado
+        };
+      }
+    }
+
+    // =========================================================================
+    // 6. MOTOR SQLITE EN MEMORIA (sql.js)
+    // =========================================================================
+    let sqliteDb = null;
+    let objetos_eventos = [];
+    let objetos_clientes = [];
+    let objetos_entradas = [];
+    let contador_entradas = 1;
+
+    async function inicializarBaseDatosSQLite() {
+      try {
+        const SQL = await initSqlJs({
+          locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+        });
+        
+        sqliteDb = new SQL.Database();
+        document.getElementById("sqlite-badge").textContent = "SQLite 3 (Memoria WASM Activa)";
+        document.getElementById("sqlite-badge").className = "text-[10px] font-mono-code px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+
+        crearTablasSQLite();
+        poblarDatosInicialesSQLite();
+        agregarLogConsola("Motor SQLite en memoria inicializado exitosamente.", "info");
+      } catch (err) {
+        console.error(err);
+        document.getElementById("sqlite-badge").textContent = "Error al cargar SQLite";
+        document.getElementById("sqlite-badge").className = "text-[10px] font-mono-code px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30";
+      }
+    }
+
+    function crearTablasSQLite() {
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS clientes (
+          id_cliente INTEGER PRIMARY KEY,
+          nombre TEXT NOT NULL,
+          email TEXT NOT NULL,
+          tipo_cliente TEXT NOT NULL,
+          nro_abono INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS eventos (
+          id_evento INTEGER PRIMARY KEY,
+          nombre TEXT NOT NULL,
+          tipo_subclase TEXT NOT NULL,
+          sala TEXT NOT NULL,
+          cupo_maximo INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS entradas (
+          numero INTEGER PRIMARY KEY,
+          id_evento INTEGER NOT NULL,
+          id_cliente INTEGER NOT NULL,
+          precio_final REAL NOT NULL,
+          estado TEXT NOT NULL,
+          fecha_emision TEXT NOT NULL,
+          FOREIGN KEY (id_evento) REFERENCES eventos (id_evento),
+          FOREIGN KEY (id_cliente) REFERENCES clientes (id_cliente)
+        );
+      `);
+    }
+
+    function poblarDatosInicialesSQLite() {
+      // Limpiar tablas
+      sqliteDb.run("DELETE FROM entradas; DELETE FROM eventos; DELETE FROM clientes;");
+
+      // Clientes iniciales
+      sqliteDb.run(`
+        INSERT INTO clientes VALUES (1, 'Brenda Moreno', 'brenda@email.com', 'Abonado', 1045);
+        INSERT INTO clientes VALUES (2, 'Maximiliano Gonzalez', 'mgonzalez@email.com', 'General', NULL);
+        INSERT INTO clientes VALUES (3, 'Ehimy Ahumada', 'ehimy@email.com', 'General', NULL);
+      `);
+
+      // Eventos iniciales (Evento 101 con cupo 1 para probar error de cupo)
+      sqliteDb.run(`
+        INSERT INTO eventos VALUES (101, 'Ópera: El Cascanueces', 'Estándar', 'Sala Principal', 1);
+        INSERT INTO eventos VALUES (102, 'Gala Lírica VIP', 'VIP', 'Sala Premium', 4);
+      `);
+
+      // Sincronizar objetos en memoria con la BD
+      sincronizarObjetosDesdeBD();
+      contador_entradas = 1;
+      actualizarInterfazCompleta();
+    }
+
+    function sincronizarObjetosDesdeBD() {
+      // 1. Cargar Clientes
+      objetos_clientes = [];
+      const resClientes = sqliteDb.exec("SELECT * FROM clientes");
+      if (resClientes.length > 0) {
+        const rows = resClientes[0].values;
+        rows.forEach(r => {
+          objetos_clientes.push(new Cliente(r[0], r[1], r[2], r[3], r[4]));
+        });
+      }
+
+      // 2. Cargar Eventos
+      objetos_eventos = [];
+      const resEventos = sqliteDb.exec("SELECT * FROM eventos");
+      if (resEventos.length > 0) {
+        const rows = resEventos[0].values;
+        rows.forEach(r => {
+          if (r[2] === "VIP") {
+            objetos_eventos.push(new EventoVIP(r[0], r[1], r[3], r[4]));
+          } else {
+            objetos_eventos.push(new EventoEstandar(r[0], r[1], r[3], r[4]));
+          }
+        });
+      }
+
+      // 3. Cargar Entradas y asociarlas a los eventos
+      objetos_entradas = [];
+      const resEntradas = sqliteDb.exec("SELECT * FROM entradas");
+      if (resEntradas.length > 0) {
+        const rows = resEntradas[0].values;
+        rows.forEach(r => {
+          const ev = objetos_eventos.find(e => e.id_evento === r[1]);
+          const cl = objetos_clientes.find(c => c.id_cliente === r[2]);
+          const ent = new Entrada(r[0], ev, cl, r[3]);
+          ent.estado = r[4];
+          ent.fecha_emision = r[5];
+          objetos_entradas.push(ent);
+          if (ev) ev.entradas_vendidas.push(ent);
+        });
+      }
+    }
+
+    // =========================================================================
+    // 7. GESTIÓN DE LA CONSOLA PYTHON SIMULADA
+    // =========================================================================
+    function agregarLogConsola(texto, tipo = "normal") {
+      const salida = document.getElementById("consola-salida");
+      const linea = document.createElement("div");
+      linea.className = "leading-relaxed break-words";
+      const hora = new Date().toLocaleTimeString();
+
+      if (tipo === "try") {
+        linea.innerHTML = `<span class="text-slate-500">[${hora}]</span> <span class="text-indigo-400 font-semibold">&gt;&gt;&gt; try:</span> ${texto}`;
+      } else if (tipo === "success") {
+        linea.innerHTML = `<span class="text-slate-500">[${hora}]</span> <span class="text-emerald-400 font-bold">✔ [ÉXITO]</span> ${texto}`;
+      } else if (tipo === "raise") {
+        linea.innerHTML = `<span class="text-slate-500">[${hora}]</span> <span class="text-rose-400 font-bold">⚡ [RAISE]:</span> <span class="text-rose-300">${texto}</span>`;
+      } else if (tipo === "except") {
+        linea.innerHTML = `<span class="text-slate-500">[${hora}]</span> <span class="text-amber-400 font-bold">🛡 [EXCEPT CAPTURADO]:</span> <span class="text-amber-200">${texto}</span>`;
+      } else if (tipo === "sql") {
+        linea.innerHTML = `<span class="text-slate-500">[${hora}]</span> <span class="text-cyan-400 font-mono-code font-bold">💾 [SQL]:</span> <span class="text-cyan-200">${texto}</span>`;
+      } else if (tipo === "info") {
+        linea.innerHTML = `<span class="text-slate-500">[${hora}]</span> <span class="text-blue-400">ℹ</span> ${texto}`;
+      } else {
+        linea.innerHTML = `<span class="text-slate-500">[${hora}]</span> ${texto}`;
+      }
+
+      salida.appendChild(linea);
+      salida.scrollTop = salida.scrollHeight;
+
+      document.getElementById("consola-ultimo-estado").textContent = `Última traza: ${tipo.toUpperCase()}`;
+    }
+
+    function limpiarPantallaConsola() {
+      document.getElementById("consola-salida").innerHTML = '<div class="text-slate-500">// Consola limpia.</div>';
+    }
+
+    // =========================================================================
+    // 8. EJECUCIÓN DE PRUEBAS RÁPIDAS (EXIGIDAS EN LA DEFENSA)
+    // =========================================================================
+    function ejecutarPruebaDocente(caso) {
+      if (caso === 'feliz') {
+        const evVip = objetos_eventos.find(e => e.tipo_subclase === 'VIP');
+        const cli = objetos_clientes[0];
+        const precioBase = 4000;
+
+        agregarLogConsola(`evento = EventoVIP(id=${evVip.id_evento})`, "try");
+        agregarLogConsola(`ticket = evento.vender_entrada(cliente='${cli.nombre}', precio_base=${precioBase})`, "try");
+
+        try {
+          const t = evVip.vender_entrada(cli, precioBase, contador_entradas);
+          
+          // Persistir en SQLite
+          sqliteDb.run(
+            `INSERT INTO entradas VALUES (?, ?, ?, ?, ?, ?)`,
+            [t.numero, t.evento.id_evento, t.cliente.id_cliente, t.precio, t.estado, t.fecha_emision]
+          );
+          objetos_entradas.push(t);
+          contador_entradas++;
+
+          agregarLogConsola(`INSERT INTO entradas (numero, id_evento, id_cliente, precio_final) VALUES (${t.numero}, ${t.evento.id_evento}, ${t.cliente.id_cliente}, ${t.precio.toFixed(2)});`, "sql");
+          agregarLogConsola(`Venta exitosa. Polimorfismo VIP: $${precioBase} + 25% = $${t.precio.toFixed(2)}. Ticket N° ${t.numero} emitido.`, "success");
+
+          abrirModal(
+            "Venta Exitosa (Camino Feliz)",
+            "Operación completada sin excepciones",
+            `Ticket N°: ${t.numero}\nEvento: ${t.evento.nombre} (${t.evento.tipo_subclase})\nTitular: ${t.cliente.nombre}\nPrecio Final: $${t.precio.toFixed(2)}\n\nEl método polimórfico calcular_precio_final() de EventoVIP aplicó correctamente el recargo del 25% y se guardó en SQLite.`,
+            "success"
+          );
+        } catch (err) {
+          agregarLogConsola(`Error: ${err.message}`, "except");
+        }
+      }
+
+      else if (caso === 'precio_negativo') {
+        const ev = objetos_eventos[0];
+        const cli = objetos_clientes[1];
+        const precioInvalido = -500;
+
+        agregarLogConsola(`evento.vender_entrada(cliente='${cli.nombre}', precio_base=${precioInvalido})`, "try");
+
+        try {
+          ev.vender_entrada(cli, precioInvalido, contador_entradas);
+        } catch (err) {
+          if (err instanceof DatoInvalidoError) {
+            agregarLogConsola(`raise DatoInvalidoError("${err.message}")`, "raise");
+            agregarLogConsola(`except DatoInvalidoError as e: Capturado limpiamente. No se insertó nada en la BD.`, "except");
+
+            abrirModal(
+              "Excepción Capturada: DatoInvalidoError",
+              "Consigna 2: Validación con raise",
+              `Traza capturada con try/except:\n\nraise DatoInvalidoError("${err.message}")\n\nEl método de negocio abortó la venta y la base de datos se mantiene intacta.`,
+              "error"
+            );
+          }
+        }
+      }
+
+      else if (caso === 'sin_cupo') {
+        const evCascanueces = objetos_eventos.find(e => e.id_evento === 101);
+        const cli = objetos_clientes[2];
+
+        agregarLogConsola(`Verificando cupo en '${evCascanueces.nombre}' (Capacidad: ${evCascanueces.entradas_vendidas.length}/${evCascanueces.cupo_maximo})...`, "try");
+
+        // Nos aseguramos de llenar la sala para forzar la excepción
+        if (evCascanueces.tiene_cupo_disponible()) {
+          const tPrevio = evCascanueces.vender_entrada(objetos_clientes[0], 3500, contador_entradas);
+          sqliteDb.run(
+            `INSERT INTO entradas VALUES (?, ?, ?, ?, ?, ?)`,
+            [tPrevio.numero, tPrevio.evento.id_evento, tPrevio.cliente.id_cliente, tPrevio.precio, tPrevio.estado, tPrevio.fecha_emision]
+          );
+          objetos_entradas.push(tPrevio);
+          contador_entradas++;
+          agregarLogConsola(`(Se emitió la última entrada para agotar la sala)`, "info");
+        }
+
+        // Intento con sala agotada
+        try {
+          agregarLogConsola(`evento.vender_entrada(cliente='${cli.nombre}', precio_base=3500)`, "try");
+          evCascanueces.vender_entrada(cli, 3500, contador_entradas);
+        } catch (err) {
+          if (err instanceof EntradaInvalidaError) {
+            agregarLogConsola(`raise EntradaInvalidaError("${err.message}")`, "raise");
+            agregarLogConsola(`except EntradaInvalidaError as e: Regla de dominio verificada. Sistema protegido.`, "except");
+
+            abrirModal(
+              "Excepción Capturada: EntradaInvalidaError",
+              "Regla de Negocio: Cupo Agotado",
+              `Traza capturada:\n\nraise EntradaInvalidaError("${err.message}")\n\nSe respetó la capacidad física de la sala cultural.`,
+              "warning"
+            );
+          }
+        }
+      }
+
+      else if (caso === 'abstracta') {
+        agregarLogConsola(`instancia = EventoBase(99, "Evento Fantasma", "Sala Z", 10)`, "try");
+        try {
+          new EventoBase(99, "Evento Fantasma", "Sala Z", 10);
+        } catch (err) {
+          if (err instanceof TypeError) {
+            agregarLogConsola(`raise TypeError("${err.message}")`, "raise");
+            agregarLogConsola(`except TypeError as e: Python prohíbe instanciar clases abstractas con métodos abstractos.`, "except");
+
+            abrirModal(
+              "Clase Abstracta Protegida",
+              "Requisito Consigna 2 con abc.ABC",
+              `Resultado de la prueba:\n\nTypeError: ${err.message}\n\nExplicación: EventoBase solo sirve como molde o plantilla; únicamente sus subclases concretas (EventoEstandar y EventoVIP) pueden ser instanciadas.`,
+              "info"
+            );
+          }
+        }
+      }
+
+      actualizarInterfazCompleta();
+    }
+
+    // =========================================================================
+    // 9. OPERACIÓN PRINCIPAL DESDE EL FORMULARIO
+    // =========================================================================
+    function enviarVentaFormulario(event) {
+      event.preventDefault();
+
+      const eventoId = parseInt(document.getElementById("select-evento").value);
+      const clienteId = parseInt(document.getElementById("select-cliente").value);
+      const precioBase = parseFloat(document.getElementById("input-precio-base").value);
+
+      const evento = objetos_eventos.find(e => e.id_evento === eventoId);
+      const cliente = objetos_clientes.find(c => c.id_cliente === clienteId);
+
+      agregarLogConsola(`Formulario enviado: Evento #${evento.id_evento}, Cliente #${cliente.id_cliente}, Precio Base: $${precioBase}`, "try");
+
+      try {
+        const ticket = evento.vender_entrada(cliente, precioBase, contador_entradas);
+        
+        // Guardar en la base de datos SQLite
+        sqliteDb.run(
+          `INSERT INTO entradas VALUES (?, ?, ?, ?, ?, ?)`,
+          [ticket.numero, ticket.evento.id_evento, ticket.cliente.id_cliente, ticket.precio, ticket.estado, ticket.fecha_emision]
+        );
+        objetos_entradas.push(ticket);
+        contador_entradas++;
+
+        agregarLogConsola(`INSERT INTO entradas VALUES (${ticket.numero}, ${evento.id_evento}, ${cliente.id_cliente}, ${ticket.precio.toFixed(2)}, '${ticket.estado}', '${ticket.fecha_emision}');`, "sql");
+        agregarLogConsola(`Entrada N° ${ticket.numero} emitida a ${cliente.nombre} por $${ticket.precio.toFixed(2)}`, "success");
+
+        abrirModal(
+          "¡Entrada Emitida con Éxito!",
+          "Venta registrada en SQLite",
+          `Entrada N°: ${ticket.numero}\nEvento: ${evento.nombre} (${evento.tipo_subclase})\nSala: ${evento.sala}\nCliente: ${cliente.nombre}\nPrecio Cobrado: $${ticket.precio.toFixed(2)}`,
+          "success"
+        );
+      } catch (err) {
+        if (err instanceof DatoInvalidoError) {
+          agregarLogConsola(`raise DatoInvalidoError("${err.message}")`, "raise");
+          agregarLogConsola(`except DatoInvalidoError: Capturado en el formulario.`, "except");
+          abrirModal("Dato Inválido Rechazado", "Excepción DatoInvalidoError", err.message, "error");
+        } else if (err instanceof EntradaInvalidaError) {
+          agregarLogConsola(`raise EntradaInvalidaError("${err.message}")`, "raise");
+          agregarLogConsola(`except EntradaInvalidaError: Capturado en el formulario.`, "except");
+          abrirModal("Operación Rechazada", "Excepción EntradaInvalidaError", err.message, "warning");
+        } else {
+          agregarLogConsola(`Error: ${err.message}`, "except");
+        }
+      }
+
+      actualizarInterfazCompleta();
+    }
+
+    function alCambiarEventoSeleccionado() {
+      const select = document.getElementById("select-evento");
+      if (!select || !select.value) return;
+
+      const evento = objetos_eventos.find(e => e.id_evento === parseInt(select.value));
+      const badgeCupo = document.getElementById("badge-cupo-formulario");
+      const hint = document.getElementById("hint-polimorfismo");
+      const inputPrecio = document.getElementById("input-precio-base");
+      const preview = document.getElementById("preview-precio-calculado");
+
+      if (evento) {
+        const disponibles = evento.cupo_maximo - evento.entradas_vendidas.length;
+        badgeCupo.textContent = `Disponibles: ${disponibles}/${evento.cupo_maximo}`;
+        badgeCupo.className = disponibles > 0 ? "font-mono-code text-emerald-400 font-semibold" : "font-mono-code text-rose-400 font-semibold";
+
+        if (evento instanceof EventoVIP) {
+          hint.innerHTML = `<i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i> <span class="text-amber-300 font-medium">Subclase EventoVIP: Aplica recargo del 25% sobre el precio base.</span>`;
+        } else {
+          hint.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-slate-400"></i> <span>Subclase EventoEstandar: Tarifa base plana (sin modificaciones).</span>`;
+        }
+
+        const base = parseFloat(inputPrecio.value) || 0;
+        try {
+          const finalCalc = evento.calcular_precio_final(base);
+          preview.textContent = `$${finalCalc.toFixed(2)}`;
+        } catch {
+          preview.textContent = `$0.00`;
+        }
+
+        lucide.createIcons();
+      }
+    }
+
+    document.getElementById("input-precio-base").addEventListener("input", alCambiarEventoSeleccionado);
+
+    // =========================================================================
+    // 10. SINCRONIZACIÓN Y RENDERIZADO VISUAL
+    // =========================================================================
+    function actualizarInterfazCompleta() {
+      renderizarSelectores();
+      renderizarTablasSQLite();
+      renderizarReportables();
+      alCambiarEventoSeleccionado();
+    }
+
+    function renderizarSelectores() {
+      const selEv = document.getElementById("select-evento");
+      const selCli = document.getElementById("select-cliente");
+      const prevEv = selEv.value;
+      const prevCli = selCli.value;
+
+      selEv.innerHTML = objetos_eventos.map(ev => 
+        `<option value="${ev.id_evento}">[#${ev.id_evento}] ${ev.nombre} (${ev.tipo_subclase} - ${ev.entradas_vendidas.length}/${ev.cupo_maximo})</option>`
+      ).join('');
+
+      selCli.innerHTML = objetos_clientes.map(cl => 
+        `<option value="${cl.id_cliente}">${cl.obtener_detalle()}</option>`
+      ).join('');
+
+      if (prevEv) selEv.value = prevEv;
+      if (prevCli) selCli.value = prevCli;
+    }
+
+    function renderizarTablasSQLite() {
+      if (!sqliteDb) return;
+
+      // 1. Tabla Eventos desde SQLite
+      const resEventos = sqliteDb.exec("SELECT * FROM eventos");
+      const tbodyEv = document.getElementById("tbody-eventos");
+      if (resEventos.length > 0) {
+        const rows = resEventos[0].values;
+        document.getElementById("badge-total-eventos").textContent = `${rows.length} registros`;
+        tbodyEv.innerHTML = rows.map(r => {
+          const obj = objetos_eventos.find(e => e.id_evento === r[0]);
+          const vendidas = obj ? obj.entradas_vendidas.length : 0;
+          const cupo = r[4];
+          const lleno = vendidas >= cupo;
+          return `
+            <tr class="hover:bg-slate-800/40 transition-colors">
+              <td class="py-2.5 px-4 font-bold text-slate-200">#${r[0]}</td>
+              <td class="py-2.5 px-4 font-sans font-medium text-slate-200">${r[1]}</td>
+              <td class="py-2.5 px-4">
+                <span class="px-2 py-0.5 rounded text-[11px] font-semibold ${r[2] === 'VIP' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-700 text-slate-300'}">
+                  ${r[2]}
+                </span>
+              </td>
+              <td class="py-2.5 px-4 text-slate-400 font-sans">${r[3]}</td>
+              <td class="py-2.5 px-4">${cupo}</td>
+              <td class="py-2.5 px-4 text-indigo-300 font-bold">${vendidas}</td>
+              <td class="py-2.5 px-4">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${lleno ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}">
+                  ${lleno ? 'AGOTADO' : `LIBRE (${cupo - vendidas})`}
+                </span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        tbodyEv.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-slate-500 italic">Tabla vacía.</td></tr>`;
+      }
+
+      // 2. Tabla Clientes desde SQLite
+      const resClientes = sqliteDb.exec("SELECT * FROM clientes");
+      const tbodyCli = document.getElementById("tbody-clientes");
+      if (resClientes.length > 0) {
+        const rows = resClientes[0].values;
+        document.getElementById("badge-total-clientes").textContent = `${rows.length} registros`;
+        tbodyCli.innerHTML = rows.map(r => `
+          <tr class="hover:bg-slate-800/40 transition-colors">
+            <td class="py-2.5 px-4 font-bold text-slate-200">#${r[0]}</td>
+            <td class="py-2.5 px-4 font-sans font-medium text-slate-200">${r[1]}</td>
+            <td class="py-2.5 px-4 text-slate-400 font-mono-code">${r[2]}</td>
+            <td class="py-2.5 px-4">
+              <span class="px-2 py-0.5 rounded text-[11px] ${r[3] === 'Abonado' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'bg-slate-700 text-slate-300'}">
+                ${r[3]}
+              </span>
+            </td>
+            <td class="py-2.5 px-4 text-slate-400">${r[4] !== null ? r[4] : '—'}</td>
+          </tr>
+        `).join('');
+      }
+
+      // 3. Tabla Entradas desde SQLite
+      const resEntradas = sqliteDb.exec("SELECT * FROM entradas");
+      const tbodyEnt = document.getElementById("tbody-entradas");
+      if (resEntradas.length > 0) {
+        const rows = resEntradas[0].values;
+        document.getElementById("badge-total-entradas").textContent = `${rows.length} emitidas`;
+        tbodyEnt.innerHTML = rows.map(r => {
+          const ev = objetos_eventos.find(e => e.id_evento === r[1]);
+          const cl = objetos_clientes.find(c => c.id_cliente === r[2]);
+          return `
+            <tr class="hover:bg-slate-800/40 transition-colors">
+              <td class="py-2.5 px-4 font-bold text-emerald-400">N° ${r[0]}</td>
+              <td class="py-2.5 px-4 font-sans text-slate-200">${ev ? ev.nombre : `ID ${r[1]}`}</td>
+              <td class="py-2.5 px-4 font-sans text-slate-300">${cl ? cl.nombre : `ID ${r[2]}`}</td>
+              <td class="py-2.5 px-4 font-bold text-emerald-300 font-mono-code">$${r[3].toFixed(2)}</td>
+              <td class="py-2.5 px-4">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  ${r[4]}
+                </span>
+              </td>
+              <td class="py-2.5 px-4 text-slate-400 text-[11px]">${r[5]}</td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        document.getElementById("badge-total-entradas").textContent = "0 emitidas";
+        tbodyEnt.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-500 font-sans italic">No se han emitido entradas todavía. Ejecuta una venta en el simulador.</td></tr>`;
+      }
+    }
+
+    function renderizarReportables() {
+      const container = document.getElementById("contenedor-reportables");
+      const lista = [];
+
+      objetos_eventos.forEach(ev => lista.push(ev.generar_resumen()));
+      if (objetos_entradas.length > 0) {
+        lista.push(objetos_entradas[objetos_entradas.length - 1].generar_resumen());
+      }
+
+      container.innerHTML = lista.map(r => `
+        <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-mono-code uppercase px-2 py-0.5 rounded ${r.tipo === 'Evento' ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-700' : 'bg-emerald-900/60 text-emerald-300 border border-emerald-700'}">
+                Reportable: ${r.tipo}
+              </span>
+              <span class="text-[10px] font-mono-code font-bold ${r.estado === 'DISPONIBLE' || r.estado === 'EMITIDA' ? 'text-emerald-400' : 'text-rose-400'}">
+                ● ${r.estado}
+              </span>
+            </div>
+            <h4 class="font-bold text-sm text-white mb-0.5">${r.titulo}</h4>
+            <p class="text-xs text-slate-400 mb-3">${r.subtitulo}</p>
+            <ul class="space-y-1 text-xs text-slate-300 font-mono-code border-t border-slate-800/80 pt-2.5">
+              ${r.detalles.map(d => `<li class="flex items-center gap-1.5"><span class="text-indigo-400">▪</span> ${d}</li>`).join('')}
+            </ul>
+          </div>
+          <div class="mt-3 pt-2 text-[10px] text-slate-400 border-t border-slate-800 flex justify-between">
+            <span>Método: generar_resumen()</span>
+            <span class="text-emerald-400">Cumple Contrato</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // 11. CONSOLA SQL LIBRE
+    // =========================================================================
+    function ejecutarSqlRapido(sql) {
+      document.getElementById("input-sql").value = sql;
+      ejecutarConsultaSqlManual();
+    }
+
+    function ejecutarConsultaSqlManual() {
+      const query = document.getElementById("input-sql").value.trim();
+      const resultadoDiv = document.getElementById("resultado-sql-libre");
+
+      try {
+        const resultado = sqliteDb.exec(query);
+        agregarLogConsola(query, "sql");
+
+        if (resultado.length === 0) {
+          resultadoDiv.classList.remove("hidden");
+          resultadoDiv.innerHTML = `<span class="text-emerald-400">Consulta ejecutada correctamente (sin filas devueltas).</span>`;
+        } else {
+          resultadoDiv.classList.remove("hidden");
+          const cols = resultado[0].columns;
+          const vals = resultado[0].values;
+
+          let html = `<table class="w-full text-left border-collapse"><thead><tr class="border-b border-slate-700 text-indigo-300">`;
+          cols.forEach(c => html += `<th class="p-1">${c}</th>`);
+          html += `</tr></thead><tbody>`;
+          vals.forEach(row => {
+            html += `<tr class="border-b border-slate-800/60 hover:bg-slate-800/30">`;
+            row.forEach(v => html += `<td class="p-1">${v !== null ? v : 'NULL'}</td>`);
+            html += `</tr>`;
+          });
+          html += `</tbody></table>`;
+          resultadoDiv.innerHTML = html;
+        }
+
+        sincronizarObjetosDesdeBD();
+        actualizarInterfazCompleta();
+      } catch (err) {
+        resultadoDiv.classList.remove("hidden");
+        resultadoDiv.innerHTML = `<span class="text-rose-400">Error SQL: ${err.message}</span>`;
+        agregarLogConsola(`Error SQL: ${err.message}`, "except");
+      }
+    }
+
+    function descargarBaseDatosSQLite() {
+      if (!sqliteDb) return;
+      const binario = sqliteDb.export();
+      const blob = new Blob([binario], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = "entradas_culturales.sqlite";
+      enlace.click();
+      URL.revokeObjectURL(url);
+      abrirModal("Base de Datos Exportada", "Archivo .sqlite generado", "Se descargó el archivo SQLite con todas las tablas y ventas registradas.", "info");
+    }
+
+    // =========================================================================
+    // 12. CONTROL DE NAVEGACIÓN Y DIAGRAMAS
+    // =========================================================================
+    function cambiarPestana(id) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      });
+
+      const btnActivo = document.getElementById(`btn-tab-${id}`);
+      if (btnActivo) {
+        btnActivo.classList.remove('bg-slate-800', 'text-slate-300');
+        btnActivo.classList.add('bg-indigo-600', 'text-white');
+      }
+
+      document.getElementById('vista-simulador').classList.add('hidden');
+      document.getElementById('vista-basedatos').classList.add('hidden');
+      document.getElementById('vista-uml').classList.add('hidden');
+
+      document.getElementById(`vista-${id}`).classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function seleccionarDiagrama(diag) {
+      document.querySelectorAll('.diag-sub-btn').forEach(b => {
+        b.classList.remove('bg-indigo-600', 'text-white');
+        b.classList.add('bg-slate-800', 'text-slate-400');
+      });
+
+      const btn = document.getElementById(`btn-subdiag-${diag}`);
+      if (btn) {
+        btn.classList.remove('bg-slate-800', 'text-slate-400');
+        btn.classList.add('bg-indigo-600', 'text-white');
+      }
+
+      document.getElementById('subdiag-secuencia').classList.add('hidden');
+      document.getElementById('subdiag-clases').classList.add('hidden');
+      document.getElementById('subdiag-casos_uso').classList.add('hidden');
+
+      document.getElementById(`subdiag-${diag}`).classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function copiarCodigoPlantUmlActual() {
+      const plantUml = `@startuml
+actor Cliente
+participant ":EventoBase" as Evento
+participant ":Entrada" as Entrada
+
+Cliente -> Evento: vender_entrada(cliente, precio_base)
+activate Evento
+
+alt precio_base <= 0
+    Evento --> Cliente: throw DatoInvalidoError("Precio inválido")
+else NOT tiene_cupo_disponible()
+    Evento --> Cliente: throw EntradaInvalidaError("Sin cupo")
+else Camino Feliz (Datos válidos y cupo disponible)
+    Evento -> Evento: calcular_precio_final(precio_base)
+    create Entrada
+    Evento -> Entrada: new(numero, self, cliente, precio_final)
+    activate Entrada
+    Entrada --> Evento: instancia_entrada
+    deactivate Entrada
+    Evento -> Evento: entradas_vendidas.append(nueva_entrada)
+    Evento --> Cliente: nueva_entrada
+    deactivate Evento
+end
+@enduml`;
+
+      const txt = document.createElement("textarea");
+      txt.value = plantUml;
+      document.body.appendChild(txt);
+      txt.select();
+      document.execCommand('copy');
+      document.body.removeChild(txt);
+
+      abrirModal("Código PlantUML Copiado", "Listo para pegar en PlantText o Draw.io", plantUml, "info");
+    }
+
+    function reiniciarBaseDatos() {
+      poblarDatosInicialesSQLite();
+      agregarLogConsola("Base de datos y objetos reiniciados a valores originales.", "info");
+      abrirModal("Sistema Reiniciado", "Valores restaurados", "Se resetearon los clientes, eventos y entradas.", "info");
+    }
+
+    // =========================================================================
+    // 13. MODAL DE NOTIFICACIONES (Sin alert())
+    // =========================================================================
+    function abrirModal(titulo, subtitulo, mensaje, tipo = "info") {
+      document.getElementById("modal-titulo").textContent = titulo;
+      document.getElementById("modal-subtitulo").textContent = subtitulo;
+      document.getElementById("modal-cuerpo").textContent = mensaje;
+
+      const caja = document.getElementById("modal-icono-caja");
+      const icono = document.getElementById("modal-icono");
+
+      if (tipo === "error") {
+        caja.className = "p-2 rounded-xl bg-rose-500/20 text-rose-400";
+        icono.setAttribute("data-lucide", "alert-triangle");
+      } else if (tipo === "warning") {
+        caja.className = "p-2 rounded-xl bg-amber-500/20 text-amber-400";
+        icono.setAttribute("data-lucide", "alert-circle");
+      } else if (tipo === "success") {
+        caja.className = "p-2 rounded-xl bg-emerald-500/20 text-emerald-400";
+        icono.setAttribute("data-lucide", "check-circle");
+      } else {
+        caja.className = "p-2 rounded-xl bg-indigo-500/20 text-indigo-400";
+        icono.setAttribute("data-lucide", "info");
+      }
+
+      document.getElementById("modal-notificacion").classList.remove("hidden");
+      lucide.createIcons();
+    }
+
+    function cerrarModal() {
+      document.getElementById("modal-notificacion").classList.add("hidden");
+    }
+
+    // =========================================================================
+    // INICIALIZACIÓN GLOBAL
+    // =========================================================================
+    window.addEventListener("DOMContentLoaded", () => {
+      inicializarBaseDatosSQLite();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import sqlite3
+import os
 from abc import ABC, abstractmethod
 from flask import Flask, request, jsonify, render_template_string
 
@@ -6,16 +7,16 @@ from flask import Flask, request, jsonify, render_template_string
 # 1. EXCEPCIONES PERSONALIZADAS DEL DOMINIO (Consigna 2)
 # ==============================================================================
 class EntradaInvalidaError(Exception):
-    """Regla de negocio: Sin cupo o duplicado."""
+    """Regla de negocio: Sin cupo o entradas duplicadas."""
     pass
 
 class DatoInvalidoError(Exception):
-    """Regla de validación: Precios o campos incorrectos."""
+    """Regla de validación: Precios inválidos o datos vacíos."""
     pass
 
 
 # ==============================================================================
-# 2. INTERFAZ Reportable (Consigna 2)
+# 2. INTERFAZ PURA Reportable (Consigna 2)
 # ==============================================================================
 class Reportable(ABC):
     @abstractmethod
@@ -25,23 +26,32 @@ class Reportable(ABC):
 
 
 # ==============================================================================
-# 3. MODELO ORIENTADO A OBJETOS (Consigna 2)
+# 3. CLASES Y POLIMORFISMO (Consigna 2)
 # ==============================================================================
 class Cliente:
     def __init__(self, id_cliente: int, nombre: str, email: str):
         if not nombre or not nombre.strip():
-            raise DatoInvalidoError("El nombre del cliente no puede estar vacío.")
+            raise DatoInvalidoError("Falta ingresar el Nombre del cliente.")
+        if not email or not email.strip():
+            raise DatoInvalidoError("Falta ingresar el Email del cliente.")
         self.id_cliente = id_cliente
-        self.nombre = nombre
-        self.email = email
+        self.nombre = nombre.strip()
+        self.email = email.strip()
 
 
 class EventoBase(Reportable, ABC):
-    """Clase base abstracta. No puede ser instanciada directamente."""
+    """Clase base abstracta. No permite instanciación directa."""
     def __init__(self, id_evento: int, nombre: str, sala: str, cupo_maximo: int, tipo: str):
+        if not nombre or not nombre.strip():
+            raise DatoInvalidoError("Falta ingresar el Nombre del evento.")
+        if not sala or not sala.strip():
+            raise DatoInvalidoError("Falta ingresar la Sala del evento.")
+        if cupo_maximo <= 0:
+            raise DatoInvalidoError("El Cupo Máximo debe ser un número entero mayor a 0.")
+
         self.id_evento = id_evento
-        self.nombre = nombre
-        self.sala = sala
+        self.nombre = nombre.strip()
+        self.sala = sala.strip()
         self.cupo_maximo = cupo_maximo
         self.tipo = tipo
         self.entradas_vendidas = []
@@ -55,14 +65,12 @@ class EventoBase(Reportable, ABC):
         return len(self.entradas_vendidas) < self.cupo_maximo
 
     def vender_entrada(self, cliente: Cliente, precio_base: float, nro_ticket: int):
-        # Validación con raise (Consigna 2)
         if precio_base <= 0:
-            raise DatoInvalidoError(f"El precio base (${precio_base}) debe ser mayor a 0.")
+            raise DatoInvalidoError("El Precio Base debe ser mayor a $0.00.")
 
         if not self.tiene_cupo_disponible():
-            raise EntradaInvalidaError(f"No hay cupo disponible para '{self.nombre}' (Máx: {self.cupo_maximo}).")
+            raise EntradaInvalidaError(f"No hay cupo disponible para el evento '{self.nombre}' (Capacidad: {self.cupo_maximo} lugares agotada).")
 
-        # Cálculo polimórfico
         precio_final = self.calcular_precio_final(precio_base)
         nueva_entrada = Entrada(nro_ticket, self, cliente, precio_final)
         self.entradas_vendidas.append(nueva_entrada)
@@ -92,7 +100,8 @@ class EventoVIP(EventoBase):
         super().__init__(id_evento, nombre, sala, cupo_maximo, "VIP")
 
     def calcular_precio_final(self, precio_base: float) -> float:
-        return precio_base * 1.25  # +25% por servicio preferencial
+        # Aplica 25% de recargo por servicio VIP
+        return precio_base * 1.25
 
 
 class Entrada(Reportable):
@@ -112,21 +121,21 @@ class Entrada(Reportable):
 
 
 # ==============================================================================
-# 4. BASE DE DATOS SQLITE (Inicialización y Persistencia)
+# 4. BASE DE DATOS SQLITE DESDE CERO
 # ==============================================================================
 def init_db():
     conn = sqlite3.connect("ticketera.db")
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS clientes (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL,
             email TEXT NOT NULL
         )
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS eventos (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL,
             sala TEXT NOT NULL,
             cupo_maximo INTEGER NOT NULL,
@@ -143,124 +152,176 @@ def init_db():
             FOREIGN KEY(cliente_id) REFERENCES clientes(id)
         )
     """)
-    
-    # Cargar datos de prueba si la base está vacía
-    cur.execute("SELECT COUNT(*) FROM eventos")
-    if cur.fetchone()[0] == 0:
-        cur.execute("INSERT INTO clientes VALUES (1, 'Brenda Moreno', 'brenda@email.com')")
-        cur.execute("INSERT INTO clientes VALUES (2, 'Maximiliano Gonzalez', 'mgonzalez@email.com')")
-        cur.execute("INSERT INTO clientes VALUES (3, 'Ehimy Ahumada', 'ehimy@email.com')")
-
-        # Evento 1 Estándar (Cupo de 1 para probar la excepción de cupo)
-        cur.execute("INSERT INTO eventos VALUES (101, 'El Fantasma de la Ópera', 'Sala Principal', 1, 'Estándar')")
-        # Evento 2 VIP
-        cur.execute("INSERT INTO eventos VALUES (102, 'Gala Lírica VIP', 'Sala Premium', 5, 'VIP')")
-        conn.commit()
+    conn.commit()
     conn.close()
 
 init_db()
 
 
 # ==============================================================================
-# 5. APLICACIÓN WEB FLASK
+# 5. APLICACIÓN WEB FLASK Y VISTA ADMINISTRATIVA
 # ==============================================================================
 app = Flask(__name__)
 
-# Template HTML administrativo integrado en un solo archivo
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ticketera Pro - Sistema Administrativo</title>
+  <title>Ticketera Cultural - Sistema Administrativo</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans p-4 md:p-8">
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4 md:p-8">
+
+  <!-- MODAL / VENTANA EMERGENTE PARA CAMPOS FALTANTES O ALERTAS -->
+  <div id="modal-alerta" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center gap-3">
+        <div id="modal-icono-box" class="p-3 rounded-xl bg-amber-500/20 text-amber-400 font-bold text-xl">⚠️</div>
+        <div>
+          <h3 id="modal-titulo" class="text-base font-bold text-white">Dato faltante o inválido</h3>
+          <p class="text-xs text-slate-400">Notificación del sistema</p>
+        </div>
+      </div>
+      <div id="modal-mensaje" class="text-sm bg-slate-950 p-4 rounded-xl border border-slate-800 text-slate-200">
+        Mensaje
+      </div>
+      <div class="flex justify-end pt-2">
+        <button onclick="cerrarModal()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
+          Aceptar y continuar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="max-w-6xl mx-auto space-y-6">
 
     <!-- Encabezado -->
-    <header class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 border border-slate-800 p-6 rounded-2xl gap-4">
+    <header class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
-        <span class="text-xs font-mono uppercase tracking-wider text-indigo-400 bg-indigo-950/60 border border-indigo-800 px-3 py-1 rounded-full">
-          Python 3 + Flask + SQLite (Consigna 2)
+        <span class="text-xs font-mono uppercase bg-indigo-950 text-indigo-400 border border-indigo-800 px-3 py-1 rounded-full">
+          Python 3 + SQLite (Base de Datos en Limpio)
         </span>
-        <h1 class="text-2xl font-bold text-white mt-2">Sistema Administrativo de Boletos Culturales</h1>
+        <h1 class="text-2xl font-bold text-white mt-2">Boletería Cultural - Carga Manual y Emisión</h1>
       </div>
-      <button onclick="cargarDatos()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl border border-slate-700 transition">
-        🔄 Actualizar Datos
+      <button onclick="vaciarBaseDatos()" class="px-4 py-2 bg-rose-950 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded-xl text-xs font-bold transition">
+        🗑️ Vaciar Todo a 0
       </button>
     </header>
 
-    <!-- Pruebas rápidas de Consigna 2 -->
-    <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-3">
-      <h2 class="text-sm font-semibold text-slate-300">Pruebas Evaluativas de Consigna 2 (1 Clic)</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-        <button onclick="probar('feliz')" class="p-3 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-800/80 rounded-xl text-left transition">
-          <div class="text-emerald-400 font-bold text-xs">1. Camino Feliz</div>
-          <div class="text-[11px] text-slate-400">Venta VIP con +25%</div>
-        </button>
-        <button onclick="probar('precio_invalido')" class="p-3 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/80 rounded-xl text-left transition">
-          <div class="text-rose-400 font-bold text-xs">2. DatoInvalidoError</div>
-          <div class="text-[11px] text-slate-400">Precio negativo (-$500)</div>
-        </button>
-        <button onclick="probar('sin_cupo')" class="p-3 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/80 rounded-xl text-left transition">
-          <div class="text-amber-400 font-bold text-xs">3. EntradaInvalidaError</div>
-          <div class="text-[11px] text-slate-400">Superar cupo de sala</div>
-        </button>
-        <button onclick="probar('abstracta')" class="p-3 bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-800/80 rounded-xl text-left transition">
-          <div class="text-indigo-400 font-bold text-xs">4. Clase Abstracta</div>
-          <div class="text-[11px] text-slate-400">TypeError en EventoBase</div>
-        </button>
-      </div>
-    </div>
+    <!-- FORMULARIOS DE CARGA MANUAL (DESDE CERO) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-    <!-- Terminal de Logs / Respuestas -->
-    <div class="bg-black/80 border border-slate-800 rounded-2xl p-4 font-mono text-xs">
-      <div class="text-slate-500 mb-2">// Registro de ejecución (try/except en backend Python):</div>
-      <div id="terminal" class="text-slate-300 space-y-1">Esperando acción...</div>
-    </div>
-
-    <!-- Panel de Emisión Manual y Base de Datos -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      <!-- Formulario de Venta -->
+      <!-- Formulario 1: Registrar Cliente -->
       <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
-        <h3 class="font-semibold text-white text-sm">Punto de Venta (POS)</h3>
-        <form onsubmit="emitirManual(event)" class="space-y-3">
+        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>👤</span> Paso 1: Cargar Nuevo Cliente
+        </h2>
+        <form onsubmit="guardarCliente(event)" class="space-y-3">
           <div>
-            <label class="block text-xs text-slate-400 mb-1">Evento:</label>
-            <select id="sel-evento" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></select>
+            <label class="block text-xs text-slate-400 mb-1">Nombre y Apellido:</label>
+            <input type="text" id="cli-nombre" placeholder="Ej: Brenda Moreno" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
           </div>
           <div>
-            <label class="block text-xs text-slate-400 mb-1">Cliente:</label>
-            <select id="sel-cliente" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></select>
+            <label class="block text-xs text-slate-400 mb-1">Correo Electrónico:</label>
+            <input type="email" id="cli-email" placeholder="Ej: brenda@email.com" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
           </div>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">Precio Base ($):</label>
-            <input type="number" id="inp-precio" value="3000" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white">
-          </div>
-          <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs transition">
-            Emitir Entrada (Backend Python)
+          <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
+            Guardar Cliente en BD
           </button>
         </form>
       </div>
 
-      <!-- Tablas de Base de Datos SQLite -->
-      <div class="lg:col-span-2 bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
-        <h3 class="font-semibold text-white text-sm">Base de Datos SQLite (Entradas Emitidas)</h3>
-        <div class="overflow-x-auto max-h-64">
-          <table class="w-full text-left text-xs font-mono">
+      <!-- Formulario 2: Registrar Evento -->
+      <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>🎭</span> Paso 2: Cargar Nuevo Evento
+        </h2>
+        <form onsubmit="guardarEvento(event)" class="space-y-3">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Nombre Evento:</label>
+              <input type="text" id="ev-nombre" placeholder="Ej: El Cascanueces" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Sala:</label>
+              <input type="text" id="ev-sala" placeholder="Ej: Sala Principal" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Cupo Máximo:</label>
+              <input type="number" id="ev-cupo" placeholder="Ej: 2" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Categoría:</label>
+              <select id="ev-tipo" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                <option value="Estándar">Estándar (Tarifa plana)</option>
+                <option value="VIP">VIP (+25% por Catering)</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
+            Guardar Evento en BD
+          </button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- FORMULARIO 3: PUNTO DE VENTA / EMISIÓN DE TICKETS -->
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+      <h2 class="text-sm font-bold text-white flex items-center gap-2">
+        <span>🎟️</span> Paso 3: Emitir Entrada (Aplica Reglas de Consigna 2)
+      </h2>
+      <form onsubmit="emitirEntrada(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Seleccionar Evento:</label>
+          <select id="sel-evento" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white"></select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Seleccionar Cliente:</label>
+          <select id="sel-cliente" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white"></select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Precio Base ($):</label>
+          <input type="number" id="inp-precio" placeholder="Ej: 3500" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white">
+        </div>
+        <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition">
+          Confirmar y Emitir
+        </button>
+      </form>
+    </div>
+
+    <!-- TABLAS DE BASE DE DATOS SQLITE EN VIVO -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Tabla Clientes -->
+      <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
+        <h3 class="text-xs font-bold text-slate-300">Clientes Registrados en BD</h3>
+        <div class="overflow-x-auto max-h-48 text-xs font-mono">
+          <table class="w-full text-left">
             <thead class="text-slate-400 border-b border-slate-800">
-              <tr>
-                <th class="p-2">N° Ticket</th>
-                <th class="p-2">Evento</th>
-                <th class="p-2">Cliente</th>
-                <th class="p-2">Precio Final</th>
-              </tr>
+              <tr><th class="p-2">ID</th><th class="p-2">Nombre</th><th class="p-2">Email</th></tr>
             </thead>
-            <tbody id="tabla-entradas" class="divide-y divide-slate-800 text-slate-300">
-              <tr><td colspan="4" class="p-2 text-slate-500">Cargando datos...</td></tr>
+            <tbody id="tabla-clientes" class="divide-y divide-slate-800 text-slate-300">
+              <tr><td colspan="3" class="p-3 text-center text-slate-500">Sin clientes cargados aún.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tabla Eventos -->
+      <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
+        <h3 class="text-xs font-bold text-slate-300">Eventos y Disponibilidad de Cupo en BD</h3>
+        <div class="overflow-x-auto max-h-48 text-xs font-mono">
+          <table class="w-full text-left">
+            <thead class="text-slate-400 border-b border-slate-800">
+              <tr><th class="p-2">ID</th><th class="p-2">Evento</th><th class="p-2">Tipo</th><th class="p-2">Cupo</th></tr>
+            </thead>
+            <tbody id="tabla-eventos" class="divide-y divide-slate-800 text-slate-300">
+              <tr><td colspan="4" class="p-3 text-center text-slate-500">Sin eventos cargados aún.</td></tr>
             </tbody>
           </table>
         </div>
@@ -268,30 +329,99 @@ HTML_TEMPLATE = """
 
     </div>
 
+    <!-- Tabla Entradas Emitidas -->
+    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
+      <h3 class="text-xs font-bold text-slate-300">Entradas Emitidas (Historial en BD)</h3>
+      <div class="overflow-x-auto max-h-56 text-xs font-mono">
+        <table class="w-full text-left">
+          <thead class="text-slate-400 border-b border-slate-800">
+            <tr>
+              <th class="p-2">N° Ticket</th>
+              <th class="p-2">Evento</th>
+              <th class="p-2">Cliente</th>
+              <th class="p-2">Precio Cobrado</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-entradas" class="divide-y divide-slate-800 text-slate-300">
+            <tr><td colspan="4" class="p-4 text-center text-slate-500">No hay tickets emitidos todavía.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <script>
-    async function cargarDatos() {
+    // Control de Ventanas Emergentes (Modales)
+    function mostrarModal(mensaje, titulo = "Atención: dato faltante o inválido", esError = true) {
+      document.getElementById('modal-titulo').textContent = titulo;
+      document.getElementById('modal-mensaje').textContent = mensaje;
+      document.getElementById('modal-icono-box').textContent = esError ? "⚠️" : "🎉";
+      document.getElementById('modal-alerta').classList.remove('hidden');
+    }
+
+    function cerrarModal() {
+      document.getElementById('modal-alerta').classList.add('hidden');
+    }
+
+    // Cargar listas y tablas desde la Base de Datos SQLite
+    async function actualizarPantalla() {
       const res = await fetch('/api/datos');
       const data = await res.json();
-      
+
+      // Desplegable de Eventos
       const selEv = document.getElementById('sel-evento');
-      selEv.innerHTML = data.eventos.map(e => 
-        `<option value="${e.id}">[#${e.id}] ${e.nombre} (${e.tipo} - Vendidas: ${e.vendidas}/${e.cupo_maximo})</option>`
-      ).join('');
-
-      const selCl = document.getElementById('sel-cliente');
-      selCl.innerHTML = data.clientes.map(c => 
-        `<option value="${c.id}">[#${c.id}] ${c.nombre}</option>`
-      ).join('');
-
-      const tabla = document.getElementById('tabla-entradas');
-      if (data.entradas.length === 0) {
-        tabla.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">No hay entradas emitidas todavía.</td></tr>';
+      if (data.eventos.length === 0) {
+        selEv.innerHTML = '<option value="">-- No hay eventos cargados --</option>';
       } else {
-        tabla.innerHTML = data.entradas.map(t => 
+        selEv.innerHTML = data.eventos.map(e => 
+          `<option value="${e.id}">[#${e.id}] ${e.nombre} (${e.tipo} | Vendidas: ${e.vendidas}/${e.cupo_maximo})</option>`
+        ).join('');
+      }
+
+      // Desplegable de Clientes
+      const selCl = document.getElementById('sel-cliente');
+      if (data.clientes.length === 0) {
+        selCl.innerHTML = '<option value="">-- No hay clientes cargados --</option>';
+      } else {
+        selCl.innerHTML = data.clientes.map(c => 
+          `<option value="${c.id}">[#${c.id}] ${c.nombre}</option>`
+        ).join('');
+      }
+
+      // Tabla Clientes
+      const tbCl = document.getElementById('tabla-clientes');
+      if (data.clientes.length === 0) {
+        tbCl.innerHTML = '<tr><td colspan="3" class="p-3 text-center text-slate-500">Sin clientes cargados aún.</td></tr>';
+      } else {
+        tbCl.innerHTML = data.clientes.map(c => 
+          `<tr><td class="p-2 font-bold text-slate-400">#${c.id}</td><td class="p-2 text-white">${c.nombre}</td><td class="p-2 text-slate-400">${c.email}</td></tr>`
+        ).join('');
+      }
+
+      // Tabla Eventos
+      const tbEv = document.getElementById('tabla-eventos');
+      if (data.eventos.length === 0) {
+        tbEv.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">Sin eventos cargados aún.</td></tr>';
+      } else {
+        tbEv.innerHTML = data.eventos.map(e => 
+          `<tr>
+            <td class="p-2 font-bold text-slate-400">#${e.id}</td>
+            <td class="p-2 text-white">${e.nombre}</td>
+            <td class="p-2"><span class="px-2 py-0.5 rounded text-[10px] ${e.tipo === 'VIP' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 text-slate-300'}">${e.tipo}</span></td>
+            <td class="p-2 font-bold ${e.vendidas >= e.cupo_maximo ? 'text-rose-400' : 'text-emerald-400'}">${e.vendidas}/${e.cupo_maximo}</td>
+          </tr>`
+        ).join('');
+      }
+
+      // Tabla Entradas
+      const tbEn = document.getElementById('tabla-entradas');
+      if (data.entradas.length === 0) {
+        tbEn.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">No hay tickets emitidos todavía.</td></tr>';
+      } else {
+        tbEn.innerHTML = data.entradas.map(t => 
           `<tr class="hover:bg-slate-800/40">
-            <td class="p-2 text-emerald-400 font-bold">Ticket N° ${t.numero}</td>
+            <td class="p-2 font-bold text-emerald-400">Ticket N° ${t.numero}</td>
             <td class="p-2 text-white">${t.evento}</td>
             <td class="p-2">${t.cliente}</td>
             <td class="p-2 font-bold text-indigo-300">$${t.precio.toFixed(2)}</td>
@@ -300,51 +430,135 @@ HTML_TEMPLATE = """
       }
     }
 
-    async function probar(caso) {
-      const res = await fetch(`/api/prueba?caso=${caso}`);
-      const data = await res.json();
-      const term = document.getElementById('terminal');
-      
-      if (data.status === 'ok') {
-        term.innerHTML = `<span class="text-emerald-400 font-bold">✔ [ÉXITO]</span> ${data.mensaje}`;
-      } else {
-        term.innerHTML = `<span class="text-rose-400 font-bold">🛡 [EXCEPT CAPTURADO]:</span> <span class="text-rose-300">${data.tipo}: ${data.mensaje}</span>`;
+    // 1. Guardar Cliente
+    async function guardarCliente(e) {
+      e.preventDefault();
+      const nombre = document.getElementById('cli-nombre').value;
+      const email = document.getElementById('cli-email').value;
+
+      // Validación preventiva de ventana emergente
+      if (!nombre.trim()) {
+        mostrarModal("Te falta el Nombre y Apellido del cliente.");
+        return;
       }
-      cargarDatos();
+      if (!email.trim()) {
+        mostrarModal("Te falta el Correo Electrónico del cliente.");
+        return;
+      }
+
+      const res = await fetch('/api/cliente', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ nombre, email })
+      });
+      const data = await res.json();
+
+      if (data.status === 'ok') {
+        mostrarModal(data.mensaje, "¡Cliente registrado!", false);
+        document.getElementById('cli-nombre').value = '';
+        document.getElementById('cli-email').value = '';
+        actualizarPantalla();
+      } else {
+        mostrarModal(data.mensaje);
+      }
     }
 
-    async function emitirManual(e) {
+    // 2. Guardar Evento
+    async function guardarEvento(e) {
       e.preventDefault();
-      const body = {
-        evento_id: document.getElementById('sel-evento').value,
-        cliente_id: document.getElementById('sel-cliente').value,
-        precio: parseFloat(document.getElementById('inp-precio').value)
-      };
+      const nombre = document.getElementById('ev-nombre').value;
+      const sala = document.getElementById('ev-sala').value;
+      const cupo = document.getElementById('ev-cupo').value;
+      const tipo = document.getElementById('ev-tipo').value;
+
+      if (!nombre.trim()) {
+        mostrarModal("Te falta el Nombre del evento.");
+        return;
+      }
+      if (!sala.trim()) {
+        mostrarModal("Te falta la Sala o Ubicación del evento.");
+        return;
+      }
+      if (!cupo || parseInt(cupo) <= 0) {
+        mostrarModal("Te falta ingresar un Cupo Máximo válido (debe ser mayor a 0).");
+        return;
+      }
+
+      const res = await fetch('/api/evento', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ nombre, sala, cupo_maximo: parseInt(cupo), tipo })
+      });
+      const data = await res.json();
+
+      if (data.status === 'ok') {
+        mostrarModal(data.mensaje, "¡Evento registrado!", false);
+        document.getElementById('ev-nombre').value = '';
+        document.getElementById('ev-sala').value = '';
+        document.getElementById('ev-cupo').value = '';
+        actualizarPantalla();
+      } else {
+        mostrarModal(data.mensaje);
+      }
+    }
+
+    // 3. Emitir Entrada
+    async function emitirEntrada(e) {
+      e.preventDefault();
+      const evento_id = document.getElementById('sel-evento').value;
+      const cliente_id = document.getElementById('sel-cliente').value;
+      const precio = document.getElementById('inp-precio').value;
+
+      if (!evento_id) {
+        mostrarModal("Te falta seleccionar un Evento. Primero debes crearlo en el Paso 2.");
+        return;
+      }
+      if (!cliente_id) {
+        mostrarModal("Te falta seleccionar un Cliente. Primero debes crearlo en el Paso 1.");
+        return;
+      }
+      if (!precio || parseFloat(precio) <= 0) {
+        mostrarModal("Te falta ingresar el Precio Base (o ingresaste un número menor o igual a 0).");
+        return;
+      }
 
       const res = await fetch('/api/vender', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body)
+        body: JSON.stringify({
+          evento_id: parseInt(evento_id),
+          cliente_id: parseInt(cliente_id),
+          precio: parseFloat(precio)
+        })
       });
       const data = await res.json();
-      const term = document.getElementById('terminal');
 
       if (data.status === 'ok') {
-        term.innerHTML = `<span class="text-emerald-400 font-bold">✔ [ÉXITO]:</span> ${data.mensaje}`;
+        mostrarModal(data.mensaje, "¡Entrada Emitida con Éxito!", false);
+        document.getElementById('inp-precio').value = '';
+        actualizarPantalla();
       } else {
-        term.innerHTML = `<span class="text-amber-400 font-bold">🛡 [EXCEPCIÓN CAPTURADA]:</span> ${data.tipo}: ${data.mensaje}`;
+        // Muestra la excepción de Python capturada
+        mostrarModal(`[${data.tipo}]: ${data.mensaje}`);
       }
-      cargarDatos();
     }
 
-    window.onload = cargarDatos;
+    // Vaciar todo a cero
+    async function vaciarBaseDatos() {
+      if (confirm("¿Estás seguro de que deseas vaciar todas las tablas a 0?")) {
+        await fetch('/api/vaciar', { method: 'POST' });
+        actualizarPantalla();
+      }
+    }
+
+    window.onload = actualizarPantalla;
   </script>
 </body>
 </html>
 """
 
 # ==============================================================================
-# 6. RUTAS API (Endpoints REST en Python)
+# 6. RUTAS API / ENDPOINTS
 # ==============================================================================
 @app.route("/")
 def index():
@@ -354,11 +568,11 @@ def index():
 def obtener_datos():
     conn = sqlite3.connect("ticketera.db")
     cur = conn.cursor()
-    
-    cur.execute("SELECT id, nombre, email FROM clientes")
+
+    cur.execute("SELECT id, nombre, email FROM clientes ORDER BY id DESC")
     clientes = [{"id": r[0], "nombre": r[1], "email": r[2]} for r in cur.fetchall()]
 
-    cur.execute("SELECT id, nombre, sala, cupo_maximo, tipo FROM eventos")
+    cur.execute("SELECT id, nombre, sala, cupo_maximo, tipo FROM eventos ORDER BY id DESC")
     eventos = []
     for r in cur.fetchall():
         cur.execute("SELECT COUNT(*) FROM entradas WHERE evento_id = ?", (r[0],))
@@ -377,86 +591,115 @@ def obtener_datos():
 
     return jsonify({"clientes": clientes, "eventos": eventos, "entradas": entradas})
 
+@app.route("/api/cliente", methods=["POST"])
+def crear_cliente():
+    data = request.json
+    try:
+        # Validación con clase Cliente (lanza DatoInvalidoError si está vacío)
+        cliente_obj = Cliente(0, data.get("nombre", ""), data.get("email", ""))
+        
+        conn = sqlite3.connect("ticketera.db")
+        cur = conn.cursor()
+        cur.execute("INSERT INTO clientes (nombre, email) VALUES (?, ?)", (cliente_obj.nombre, cliente_obj.email))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "ok", "mensaje": f"Cliente '{cliente_obj.nombre}' guardado correctamente en la base de datos."})
+    except DatoInvalidoError as err:
+        return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": str(err)})
+
+@app.route("/api/evento", methods=["POST"])
+def crear_evento():
+    data = request.json
+    try:
+        nombre = data.get("nombre", "")
+        sala = data.get("sala", "")
+        cupo = int(data.get("cupo_maximo", 0))
+        tipo = data.get("tipo", "Estándar")
+
+        # Instanciamos la subclase correspondiente
+        if tipo == "VIP":
+            evento_obj = EventoVIP(0, nombre, sala, cupo)
+        else:
+            evento_obj = EventoEstandar(0, nombre, sala, cupo)
+
+        conn = sqlite3.connect("ticketera.db")
+        cur = conn.cursor()
+        cur.execute("INSERT INTO eventos (nombre, sala, cupo_maximo, tipo) VALUES (?, ?, ?, ?)", 
+                    (evento_obj.nombre, evento_obj.sala, evento_obj.cupo_maximo, evento_obj.tipo))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "ok", "mensaje": f"Evento '{evento_obj.nombre}' ({evento_obj.tipo}) guardado con cupo de {evento_obj.cupo_maximo} lugares."})
+    except (DatoInvalidoError, ValueError) as err:
+        return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": str(err)})
+
 @app.route("/api/vender", methods=["POST"])
 def vender():
     data = request.json
-    ev_id = int(data["evento_id"])
-    cl_id = int(data["cliente_id"])
-    precio = float(data["precio"])
+    try:
+        ev_id = int(data["evento_id"])
+        cl_id = int(data["cliente_id"])
+        precio = float(data["precio"])
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": "Falta completar los datos de venta correctamente."})
 
     conn = sqlite3.connect("ticketera.db")
     cur = conn.cursor()
 
     cur.execute("SELECT nombre, email FROM clientes WHERE id = ?", (cl_id,))
     c_row = cur.fetchone()
+    if not c_row:
+        conn.close()
+        return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": "El cliente seleccionado no existe."})
     cliente_obj = Cliente(cl_id, c_row[0], c_row[1])
 
     cur.execute("SELECT nombre, sala, cupo_maximo, tipo FROM eventos WHERE id = ?", (ev_id,))
     e_row = cur.fetchone()
-    
-    # Reconstrucción de objetos polimórficos
+    if not e_row:
+        conn.close()
+        return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": "El evento seleccionado no existe."})
+
     if e_row[3] == "VIP":
         evento_obj = EventoVIP(ev_id, e_row[0], e_row[1], e_row[2])
     else:
         evento_obj = EventoEstandar(ev_id, e_row[0], e_row[1], e_row[2])
 
+    # Reconstruimos las entradas vendidas para verificar el cupo
     cur.execute("SELECT numero, precio FROM entradas WHERE evento_id = ?", (ev_id,))
     for t_row in cur.fetchall():
         evento_obj.entradas_vendidas.append(Entrada(t_row[0], evento_obj, cliente_obj, t_row[1]))
 
-    # Bloque de captura estricto exigido por Consigna 2
     try:
         cur.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM entradas")
         nuevo_nro = cur.fetchone()[0]
-        
+
+        # Operación principal que lanza las excepciones de Consigna 2
         ticket = evento_obj.vender_entrada(cliente_obj, precio, nuevo_nro)
-        
+
         cur.execute("INSERT INTO entradas (numero, evento_id, cliente_id, precio) VALUES (?, ?, ?, ?)",
                     (ticket.numero, ev_id, cl_id, ticket.precio))
         conn.commit()
         conn.close()
-        return jsonify({"status": "ok", "mensaje": f"Ticket N° {ticket.numero} emitido para {cliente_obj.nombre}. Importe final: ${ticket.precio:.2f}"})
-    
+        return jsonify({
+            "status": "ok", 
+            "mensaje": f"Ticket N° {ticket.numero} emitido para {cliente_obj.nombre} en '{evento_obj.nombre}'. Importe final: ${ticket.precio:.2f}"
+        })
     except (DatoInvalidoError, EntradaInvalidaError) as err:
         conn.close()
         return jsonify({"status": "error", "tipo": type(err).__name__, "mensaje": str(err)})
 
-@app.route("/api/prueba")
-def prueba_rapida():
-    caso = request.args.get("caso")
-
-    if caso == "feliz":
-        ev = EventoVIP(999, "Gala Lírica VIP", "Sala Premium", 10)
-        cl = Cliente(1, "Brenda Moreno", "brenda@email.com")
-        t = ev.vender_entrada(cl, 4000.0, 9999)
-        return jsonify({"status": "ok", "mensaje": f"Venta exitosa con polimorfismo VIP (+25%): Base $4000 -> Final ${t.precio:.2f}"})
-
-    elif caso == "precio_invalido":
-        ev = EventoEstandar(101, "El Fantasma", "Sala A", 10)
-        cl = Cliente(2, "Maximiliano Gonzalez", "mg@email.com")
-        try:
-            ev.vender_entrada(cl, -500.0, 1)
-        except DatoInvalidoError as err:
-            return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": str(err)})
-
-    elif caso == "sin_cupo":
-        ev = EventoEstandar(101, "El Fantasma", "Sala A", 1) # Cupo 1
-        cl1 = Cliente(1, "Brenda", "b@email.com")
-        cl2 = Cliente(2, "Maxi", "m@email.com")
-        ev.vender_entrada(cl1, 3000.0, 1) # Se llena el cupo
-        try:
-            ev.vender_entrada(cl2, 3000.0, 2) # Falla
-        except EntradaInvalidaError as err:
-            return jsonify({"status": "error", "tipo": "EntradaInvalidaError", "mensaje": str(err)})
-
-    elif caso == "abstracta":
-        try:
-            EventoBase(1, "Evento Genérico", "Sala X", 10, "Abstracto")
-        except TypeError as err:
-            return jsonify({"status": "error", "tipo": "TypeError", "mensaje": str(err)})
-
-    return jsonify({"status": "ok", "mensaje": "Prueba completada."})
+@app.route("/api/vaciar", methods=["POST"])
+def vaciar():
+    conn = sqlite3.connect("ticketera.db")
+    cur = conn.cursor()
+    cur.execute("DELETE FROM entradas")
+    cur.execute("DELETE FROM eventos")
+    cur.execute("DELETE FROM clientes")
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
 
 
+# Para arrancar tanto en local como en Render
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)

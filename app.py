@@ -267,7 +267,7 @@ HTML_TEMPLATE = """
         <form onsubmit="guardarCliente(event)" class="space-y-3">
           <div>
             <label class="block text-xs text-slate-400 mb-1">Nombre y Apellido:</label>
-            <input type="text" id="cli-nombre" placeholder="Ej: Brenda Moreno" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            <input type="text" id="cli-nombre" placeholder="Ej: Mario Moreno" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
@@ -276,7 +276,7 @@ HTML_TEMPLATE = """
             </div>
             <div>
               <label class="block text-xs text-slate-400 mb-1">Correo Electrónico:</label>
-              <input type="email" id="cli-email" placeholder="Ej: brenda@email.com" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+              <input type="email" id="cli-email" placeholder="Ej: Mariomoreno@email.com" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
             </div>
           </div>
           <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">

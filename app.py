@@ -7,7 +7,7 @@ from flask import Flask, request, jsonify, render_template_string
 # 1. EXCEPCIONES PERSONALIZADAS DEL DOMINIO (Consigna 2)
 # ==============================================================================
 class EntradaInvalidaError(Exception):
-    """Regla de negocio: Sin cupo o entradas duplicadas."""
+    """Regla de negocio: Sin cupo o regla rota."""
     pass
 
 class DatoInvalidoError(Exception):
@@ -69,7 +69,7 @@ class EventoBase(Reportable, ABC):
             raise DatoInvalidoError("El Precio Base debe ser mayor a $0.00.")
 
         if not self.tiene_cupo_disponible():
-            raise EntradaInvalidaError(f"No hay cupo disponible para el evento '{self.nombre}' (Capacidad: {self.cupo_maximo} lugares agotada).")
+            raise EntradaInvalidaError(f"No hay cupo disponible para '{self.nombre}' (Capacidad de {self.cupo_maximo} lugares agotada).")
 
         precio_final = self.calcular_precio_final(precio_base)
         nueva_entrada = Entrada(nro_ticket, self, cliente, precio_final)
@@ -100,7 +100,6 @@ class EventoVIP(EventoBase):
         super().__init__(id_evento, nombre, sala, cupo_maximo, "VIP")
 
     def calcular_precio_final(self, precio_base: float) -> float:
-        # Aplica 25% de recargo por servicio VIP
         return precio_base * 1.25
 
 
@@ -121,7 +120,7 @@ class Entrada(Reportable):
 
 
 # ==============================================================================
-# 4. BASE DE DATOS SQLITE DESDE CERO
+# 4. BASE DE DATOS SQLITE INICIALIZADA EN LIMPIO
 # ==============================================================================
 def init_db():
     conn = sqlite3.connect("ticketera.db")
@@ -159,7 +158,7 @@ init_db()
 
 
 # ==============================================================================
-# 5. APLICACIÓN WEB FLASK Y VISTA ADMINISTRATIVA
+# 5. APLICACIÓN WEB FLASK
 # ==============================================================================
 app = Flask(__name__)
 
@@ -174,7 +173,7 @@ HTML_TEMPLATE = """
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4 md:p-8">
 
-  <!-- MODAL / VENTANA EMERGENTE PARA CAMPOS FALTANTES O ALERTAS -->
+  <!-- MODAL DE ALERTA SIMPLE (CAMPOS FALTANTES O ÉXITOS) -->
   <div id="modal-alerta" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
       <div class="flex items-center gap-3">
@@ -188,8 +187,32 @@ HTML_TEMPLATE = """
         Mensaje
       </div>
       <div class="flex justify-end pt-2">
-        <button onclick="cerrarModal()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
+        <button onclick="cerrarModalAlerta()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
           Aceptar y continuar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIRMACIÓN (DETECCIÓN DE DATOS REPETIDOS) -->
+  <div id="modal-confirmacion" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-amber-600/50 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="p-3 rounded-xl bg-amber-500/20 text-amber-400 font-bold text-xl">❓</div>
+        <div>
+          <h3 id="conf-titulo" class="text-base font-bold text-white">Dato Ya Registrado</h3>
+          <p class="text-xs text-slate-400">Confirmación requerida</p>
+        </div>
+      </div>
+      <div id="conf-mensaje" class="text-sm bg-slate-950 p-4 rounded-xl border border-slate-800 text-slate-200">
+        ¿Estás seguro de realizarlo?
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="responderConfirmacion(false)" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition">
+          Cancelar
+        </button>
+        <button onclick="responderConfirmacion(true)" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition">
+          Sí, estoy seguro
         </button>
       </div>
     </div>
@@ -201,7 +224,7 @@ HTML_TEMPLATE = """
     <header class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
         <span class="text-xs font-mono uppercase bg-indigo-950 text-indigo-400 border border-indigo-800 px-3 py-1 rounded-full">
-          Python 3 + SQLite (Base de Datos en Limpio)
+          Python 3 + SQLite (Control de Duplicados Activo)
         </span>
         <h1 class="text-2xl font-bold text-white mt-2">Boletería Cultural - Carga Manual y Emisión</h1>
       </div>
@@ -210,7 +233,7 @@ HTML_TEMPLATE = """
       </button>
     </header>
 
-    <!-- FORMULARIOS DE CARGA MANUAL (DESDE CERO) -->
+    <!-- FORMULARIOS DE CARGA MANUAL -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
       <!-- Formulario 1: Registrar Cliente -->
@@ -270,7 +293,7 @@ HTML_TEMPLATE = """
 
     </div>
 
-    <!-- FORMULARIO 3: PUNTO DE VENTA / EMISIÓN DE TICKETS -->
+    <!-- FORMULARIO 3: EMISIÓN DE TICKETS -->
     <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
       <h2 class="text-sm font-bold text-white flex items-center gap-2">
         <span>🎟️</span> Paso 3: Emitir Entrada (Aplica Reglas de Consigna 2)
@@ -294,7 +317,7 @@ HTML_TEMPLATE = """
       </form>
     </div>
 
-    <!-- TABLAS DE BASE DE DATOS SQLITE EN VIVO -->
+    <!-- TABLAS EN VIVO -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
       <!-- Tabla Clientes -->
@@ -314,7 +337,7 @@ HTML_TEMPLATE = """
 
       <!-- Tabla Eventos -->
       <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
-        <h3 class="text-xs font-bold text-slate-300">Eventos y Disponibilidad de Cupo en BD</h3>
+        <h3 class="text-xs font-bold text-slate-300">Eventos y Cupo en BD</h3>
         <div class="overflow-x-auto max-h-48 text-xs font-mono">
           <table class="w-full text-left">
             <thead class="text-slate-400 border-b border-slate-800">
@@ -352,24 +375,39 @@ HTML_TEMPLATE = """
   </div>
 
   <script>
-    // Control de Ventanas Emergentes (Modales)
-    function mostrarModal(mensaje, titulo = "Atención: dato faltante o inválido", esError = true) {
+    // Variables para controlar la acción pendiente del modal de confirmación
+    let accionPendiente = null;
+
+    function mostrarModalAlerta(mensaje, titulo = "Atención: dato faltante o inválido", esError = true) {
       document.getElementById('modal-titulo').textContent = titulo;
       document.getElementById('modal-mensaje').textContent = mensaje;
       document.getElementById('modal-icono-box').textContent = esError ? "⚠️" : "🎉";
       document.getElementById('modal-alerta').classList.remove('hidden');
     }
 
-    function cerrarModal() {
+    function cerrarModalAlerta() {
       document.getElementById('modal-alerta').classList.add('hidden');
     }
 
-    // Cargar listas y tablas desde la Base de Datos SQLite
+    function solicitarConfirmacion(mensaje, callback) {
+      document.getElementById('conf-mensaje').textContent = mensaje;
+      accionPendiente = callback;
+      document.getElementById('modal-confirmacion').classList.remove('hidden');
+    }
+
+    function responderConfirmacion(acepta) {
+      document.getElementById('modal-confirmacion').classList.add('hidden');
+      if (acepta && accionPendiente) {
+        accionPendiente();
+      }
+      accionPendiente = null;
+    }
+
     async function actualizarPantalla() {
       const res = await fetch('/api/datos');
       const data = await res.json();
 
-      // Desplegable de Eventos
+      // Desplegable Eventos
       const selEv = document.getElementById('sel-evento');
       if (data.eventos.length === 0) {
         selEv.innerHTML = '<option value="">-- No hay eventos cargados --</option>';
@@ -379,13 +417,13 @@ HTML_TEMPLATE = """
         ).join('');
       }
 
-      // Desplegable de Clientes
+      // Desplegable Clientes
       const selCl = document.getElementById('sel-cliente');
       if (data.clientes.length === 0) {
         selCl.innerHTML = '<option value="">-- No hay clientes cargados --</option>';
       } else {
         selCl.innerHTML = data.clientes.map(c => 
-          `<option value="${c.id}">[#${c.id}] ${c.nombre}</option>`
+          `<option value="${c.id}">[#${c.id}] ${c.nombre} (${c.email})</option>`
         ).join('');
       }
 
@@ -430,36 +468,40 @@ HTML_TEMPLATE = """
       }
     }
 
-    // 1. Guardar Cliente
-    async function guardarCliente(e) {
-      e.preventDefault();
+    // 1. Guardar Cliente con Detección de Duplicados
+    async function guardarCliente(e, forzar = false) {
+      if (e) e.preventDefault();
       const nombre = document.getElementById('cli-nombre').value;
       const email = document.getElementById('cli-email').value;
 
-      // Validación preventiva de ventana emergente
       if (!nombre.trim()) {
-        mostrarModal("Te falta el Nombre y Apellido del cliente.");
+        mostrarModalAlerta("Te falta el Nombre y Apellido del cliente.");
         return;
       }
       if (!email.trim()) {
-        mostrarModal("Te falta el Correo Electrónico del cliente.");
+        mostrarModalAlerta("Te falta el Correo Electrónico del cliente.");
         return;
       }
 
       const res = await fetch('/api/cliente', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ nombre, email })
+        body: JSON.stringify({ nombre, email, forzar })
       });
       const data = await res.json();
 
       if (data.status === 'ok') {
-        mostrarModal(data.mensaje, "¡Cliente registrado!", false);
+        mostrarModalAlerta(data.mensaje, "¡Cliente registrado!", false);
         document.getElementById('cli-nombre').value = '';
         document.getElementById('cli-email').value = '';
         actualizarPantalla();
+      } else if (data.status === 'duplicado') {
+        solicitarConfirmacion(
+          `El cliente con email '${email}' ya se encuentra registrado. ¿Estás seguro de registrarlo de todos modos?`,
+          () => guardarCliente(null, true)
+        );
       } else {
-        mostrarModal(data.mensaje);
+        mostrarModalAlerta(data.mensaje);
       }
     }
 
@@ -472,15 +514,15 @@ HTML_TEMPLATE = """
       const tipo = document.getElementById('ev-tipo').value;
 
       if (!nombre.trim()) {
-        mostrarModal("Te falta el Nombre del evento.");
+        mostrarModalAlerta("Te falta el Nombre del evento.");
         return;
       }
       if (!sala.trim()) {
-        mostrarModal("Te falta la Sala o Ubicación del evento.");
+        mostrarModalAlerta("Te falta la Sala o Ubicación del evento.");
         return;
       }
       if (!cupo || parseInt(cupo) <= 0) {
-        mostrarModal("Te falta ingresar un Cupo Máximo válido (debe ser mayor a 0).");
+        mostrarModalAlerta("Te falta ingresar un Cupo Máximo válido (debe ser mayor a 0).");
         return;
       }
 
@@ -492,33 +534,33 @@ HTML_TEMPLATE = """
       const data = await res.json();
 
       if (data.status === 'ok') {
-        mostrarModal(data.mensaje, "¡Evento registrado!", false);
+        mostrarModalAlerta(data.mensaje, "¡Evento registrado!", false);
         document.getElementById('ev-nombre').value = '';
         document.getElementById('ev-sala').value = '';
         document.getElementById('ev-cupo').value = '';
         actualizarPantalla();
       } else {
-        mostrarModal(data.mensaje);
+        mostrarModalAlerta(data.mensaje);
       }
     }
 
-    // 3. Emitir Entrada
-    async function emitirEntrada(e) {
-      e.preventDefault();
+    // 3. Emitir Entrada con Detección de Entrada Previa para el mismo Evento
+    async function emitirEntrada(e, forzar = false) {
+      if (e) e.preventDefault();
       const evento_id = document.getElementById('sel-evento').value;
       const cliente_id = document.getElementById('sel-cliente').value;
       const precio = document.getElementById('inp-precio').value;
 
       if (!evento_id) {
-        mostrarModal("Te falta seleccionar un Evento. Primero debes crearlo en el Paso 2.");
+        mostrarModalAlerta("Te falta seleccionar un Evento. Primero debes crearlo en el Paso 2.");
         return;
       }
       if (!cliente_id) {
-        mostrarModal("Te falta seleccionar un Cliente. Primero debes crearlo en el Paso 1.");
+        mostrarModalAlerta("Te falta seleccionar un Cliente. Primero debes crearlo en el Paso 1.");
         return;
       }
       if (!precio || parseFloat(precio) <= 0) {
-        mostrarModal("Te falta ingresar el Precio Base (o ingresaste un número menor o igual a 0).");
+        mostrarModalAlerta("Te falta ingresar el Precio Base (o ingresaste un número menor o igual a 0).");
         return;
       }
 
@@ -528,22 +570,26 @@ HTML_TEMPLATE = """
         body: JSON.stringify({
           evento_id: parseInt(evento_id),
           cliente_id: parseInt(cliente_id),
-          precio: parseFloat(precio)
+          precio: parseFloat(precio),
+          forzar: forzar
         })
       });
       const data = await res.json();
 
       if (data.status === 'ok') {
-        mostrarModal(data.mensaje, "¡Entrada Emitida con Éxito!", false);
+        mostrarModalAlerta(data.mensaje, "¡Entrada Emitida con Éxito!", false);
         document.getElementById('inp-precio').value = '';
         actualizarPantalla();
+      } else if (data.status === 'duplicado') {
+        solicitarConfirmacion(
+          data.mensaje,
+          () => emitirEntrada(null, true)
+        );
       } else {
-        // Muestra la excepción de Python capturada
-        mostrarModal(`[${data.tipo}]: ${data.mensaje}`);
+        mostrarModalAlerta(`[${data.tipo}]: ${data.mensaje}`);
       }
     }
 
-    // Vaciar todo a cero
     async function vaciarBaseDatos() {
       if (confirm("¿Estás seguro de que deseas vaciar todas las tablas a 0?")) {
         await fetch('/api/vaciar', { method: 'POST' });
@@ -558,7 +604,7 @@ HTML_TEMPLATE = """
 """
 
 # ==============================================================================
-# 6. RUTAS API / ENDPOINTS
+# 6. RUTAS API (Backend con detección de duplicados)
 # ==============================================================================
 @app.route("/")
 def index():
@@ -594,12 +640,23 @@ def obtener_datos():
 @app.route("/api/cliente", methods=["POST"])
 def crear_cliente():
     data = request.json
+    nombre = data.get("nombre", "")
+    email = data.get("email", "")
+    forzar = data.get("forzar", False)
+
     try:
-        # Validación con clase Cliente (lanza DatoInvalidoError si está vacío)
-        cliente_obj = Cliente(0, data.get("nombre", ""), data.get("email", ""))
+        cliente_obj = Cliente(0, nombre, email)
         
         conn = sqlite3.connect("ticketera.db")
         cur = conn.cursor()
+
+        # Detección de duplicado por email
+        if not forzar:
+            cur.execute("SELECT COUNT(*) FROM clientes WHERE LOWER(email) = LOWER(?)", (cliente_obj.email,))
+            if cur.fetchone()[0] > 0:
+                conn.close()
+                return jsonify({"status": "duplicado", "mensaje": "Cliente ya registrado."})
+
         cur.execute("INSERT INTO clientes (nombre, email) VALUES (?, ?)", (cliente_obj.nombre, cliente_obj.email))
         conn.commit()
         conn.close()
@@ -616,7 +673,6 @@ def crear_evento():
         cupo = int(data.get("cupo_maximo", 0))
         tipo = data.get("tipo", "Estándar")
 
-        # Instanciamos la subclase correspondiente
         if tipo == "VIP":
             evento_obj = EventoVIP(0, nombre, sala, cupo)
         else:
@@ -639,6 +695,7 @@ def vender():
         ev_id = int(data["evento_id"])
         cl_id = int(data["cliente_id"])
         precio = float(data["precio"])
+        forzar = data.get("forzar", False)
     except (TypeError, ValueError):
         return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": "Falta completar los datos de venta correctamente."})
 
@@ -663,16 +720,25 @@ def vender():
     else:
         evento_obj = EventoEstandar(ev_id, e_row[0], e_row[1], e_row[2])
 
-    # Reconstruimos las entradas vendidas para verificar el cupo
+    # Reconstrucción de entradas vendidas
     cur.execute("SELECT numero, precio FROM entradas WHERE evento_id = ?", (ev_id,))
     for t_row in cur.fetchall():
         evento_obj.entradas_vendidas.append(Entrada(t_row[0], evento_obj, cliente_obj, t_row[1]))
+
+    # Verificación de entrada duplicada para el mismo cliente en este evento
+    if not forzar:
+        cur.execute("SELECT COUNT(*) FROM entradas WHERE evento_id = ? AND cliente_id = ?", (ev_id, cl_id))
+        if cur.fetchone()[0] > 0:
+            conn.close()
+            return jsonify({
+                "status": "duplicado", 
+                "mensaje": f"El cliente {cliente_obj.nombre} ya tiene una entrada registrada para '{evento_obj.nombre}'. ¿Estás seguro de emitirle otra entrada duplicada?"
+            })
 
     try:
         cur.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM entradas")
         nuevo_nro = cur.fetchone()[0]
 
-        # Operación principal que lanza las excepciones de Consigna 2
         ticket = evento_obj.vender_entrada(cliente_obj, precio, nuevo_nro)
 
         cur.execute("INSERT INTO entradas (numero, evento_id, cliente_id, precio) VALUES (?, ?, ?, ?)",
@@ -699,7 +765,6 @@ def vaciar():
     return jsonify({"status": "ok"})
 
 
-# Para arrancar tanto en local como en Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)

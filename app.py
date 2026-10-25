@@ -29,13 +29,17 @@ class Reportable(ABC):
 # 3. CLASES Y POLIMORFISMO (Consigna 2)
 # ==============================================================================
 class Cliente:
-    def __init__(self, id_cliente: int, nombre: str, email: str):
+    def __init__(self, id_cliente: int, nombre: str, dni: str, email: str):
         if not nombre or not nombre.strip():
             raise DatoInvalidoError("Falta ingresar el Nombre del cliente.")
+        if not dni or not str(dni).strip():
+            raise DatoInvalidoError("Falta ingresar el DNI del cliente.")
         if not email or not email.strip():
             raise DatoInvalidoError("Falta ingresar el Email del cliente.")
+            
         self.id_cliente = id_cliente
         self.nombre = nombre.strip()
+        self.dni = str(dni).strip()
         self.email = email.strip()
 
 
@@ -114,24 +118,43 @@ class Entrada(Reportable):
         return {
             "ticket_nro": self.numero,
             "evento": self.evento.nombre,
-            "cliente": self.cliente.nombre,
+            "cliente": f"{self.cliente.nombre} (DNI: {self.cliente.dni})",
             "precio": self.precio
         }
 
 
 # ==============================================================================
-# 4. BASE DE DATOS SQLITE INICIALIZADA EN LIMPIO
+# 4. BASE DE DATOS SQLITE INICIALIZADA EN LIMPIO (CON DNI)
 # ==============================================================================
 def init_db():
     conn = sqlite3.connect("ticketera.db")
     cur = conn.cursor()
+    
+    # Si la tabla clientes existía sin la columna DNI, la actualizamos
     cur.execute("""
         CREATE TABLE IF NOT EXISTS clientes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL,
+            dni TEXT NOT NULL,
             email TEXT NOT NULL
         )
     """)
+    
+    # Comprobación de migración para bases de datos ya creadas
+    cur.execute("PRAGMA table_info(clientes)")
+    columnas = [col[1] for col in cur.fetchall()]
+    if "dni" not in columnas:
+        cur.execute("DROP TABLE IF EXISTS entradas")
+        cur.execute("DROP TABLE IF EXISTS clientes")
+        cur.execute("""
+            CREATE TABLE clientes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                dni TEXT NOT NULL,
+                email TEXT NOT NULL
+            )
+        """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS eventos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -173,7 +196,7 @@ HTML_TEMPLATE = """
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4 md:p-8">
 
-  <!-- MODAL DE ALERTA SIMPLE (CAMPOS FALTANTES O ÉXITOS) -->
+  <!-- MODAL DE ALERTA SIMPLE -->
   <div id="modal-alerta" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
       <div class="flex items-center gap-3">
@@ -194,7 +217,7 @@ HTML_TEMPLATE = """
     </div>
   </div>
 
-  <!-- MODAL DE CONFIRMACIÓN (DETECCIÓN DE DATOS REPETIDOS) -->
+  <!-- MODAL DE CONFIRMACIÓN (DUPLICADOS POR DNI O ENTRADA REPETIDA) -->
   <div id="modal-confirmacion" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-slate-900 border border-amber-600/50 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
       <div class="flex items-center gap-3">
@@ -224,7 +247,7 @@ HTML_TEMPLATE = """
     <header class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
         <span class="text-xs font-mono uppercase bg-indigo-950 text-indigo-400 border border-indigo-800 px-3 py-1 rounded-full">
-          Python 3 + SQLite (Control de Duplicados Activo)
+          Python 3 + SQLite (Validación por DNI y Duplicados)
         </span>
         <h1 class="text-2xl font-bold text-white mt-2">Boletería Cultural - Carga Manual y Emisión</h1>
       </div>
@@ -236,7 +259,7 @@ HTML_TEMPLATE = """
     <!-- FORMULARIOS DE CARGA MANUAL -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-      <!-- Formulario 1: Registrar Cliente -->
+      <!-- Formulario 1: Registrar Cliente con DNI -->
       <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
         <h2 class="text-sm font-bold text-white flex items-center gap-2">
           <span>👤</span> Paso 1: Cargar Nuevo Cliente
@@ -246,9 +269,15 @@ HTML_TEMPLATE = """
             <label class="block text-xs text-slate-400 mb-1">Nombre y Apellido:</label>
             <input type="text" id="cli-nombre" placeholder="Ej: Brenda Moreno" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
           </div>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">Correo Electrónico:</label>
-            <input type="email" id="cli-email" placeholder="Ej: brenda@email.com" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">DNI (Documento):</label>
+              <input type="text" id="cli-dni" placeholder="Ej: 38450123" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Correo Electrónico:</label>
+              <input type="email" id="cli-email" placeholder="Ej: brenda@email.com" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
           </div>
           <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
             Guardar Cliente en BD
@@ -304,7 +333,7 @@ HTML_TEMPLATE = """
           <select id="sel-evento" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white"></select>
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Seleccionar Cliente:</label>
+          <label class="block text-xs text-slate-400 mb-1">Seleccionar Cliente (Nombre y DNI):</label>
           <select id="sel-cliente" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white"></select>
         </div>
         <div>
@@ -320,16 +349,21 @@ HTML_TEMPLATE = """
     <!-- TABLAS EN VIVO -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-      <!-- Tabla Clientes -->
+      <!-- Tabla Clientes con DNI -->
       <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
         <h3 class="text-xs font-bold text-slate-300">Clientes Registrados en BD</h3>
         <div class="overflow-x-auto max-h-48 text-xs font-mono">
           <table class="w-full text-left">
             <thead class="text-slate-400 border-b border-slate-800">
-              <tr><th class="p-2">ID</th><th class="p-2">Nombre</th><th class="p-2">Email</th></tr>
+              <tr>
+                <th class="p-2">ID</th>
+                <th class="p-2">Nombre</th>
+                <th class="p-2">DNI</th>
+                <th class="p-2">Email</th>
+              </tr>
             </thead>
             <tbody id="tabla-clientes" class="divide-y divide-slate-800 text-slate-300">
-              <tr><td colspan="3" class="p-3 text-center text-slate-500">Sin clientes cargados aún.</td></tr>
+              <tr><td colspan="4" class="p-3 text-center text-slate-500">Sin clientes cargados aún.</td></tr>
             </tbody>
           </table>
         </div>
@@ -361,7 +395,7 @@ HTML_TEMPLATE = """
             <tr>
               <th class="p-2">N° Ticket</th>
               <th class="p-2">Evento</th>
-              <th class="p-2">Cliente</th>
+              <th class="p-2">Cliente y DNI</th>
               <th class="p-2">Precio Cobrado</th>
             </tr>
           </thead>
@@ -375,7 +409,6 @@ HTML_TEMPLATE = """
   </div>
 
   <script>
-    // Variables para controlar la acción pendiente del modal de confirmación
     let accionPendiente = null;
 
     function mostrarModalAlerta(mensaje, titulo = "Atención: dato faltante o inválido", esError = true) {
@@ -417,23 +450,28 @@ HTML_TEMPLATE = """
         ).join('');
       }
 
-      // Desplegable Clientes
+      // Desplegable Clientes (Muestra Nombre y DNI)
       const selCl = document.getElementById('sel-cliente');
       if (data.clientes.length === 0) {
         selCl.innerHTML = '<option value="">-- No hay clientes cargados --</option>';
       } else {
         selCl.innerHTML = data.clientes.map(c => 
-          `<option value="${c.id}">[#${c.id}] ${c.nombre} (${c.email})</option>`
+          `<option value="${c.id}">[#${c.id}] ${c.nombre} (DNI: ${c.dni})</option>`
         ).join('');
       }
 
-      // Tabla Clientes
+      // Tabla Clientes con DNI
       const tbCl = document.getElementById('tabla-clientes');
       if (data.clientes.length === 0) {
-        tbCl.innerHTML = '<tr><td colspan="3" class="p-3 text-center text-slate-500">Sin clientes cargados aún.</td></tr>';
+        tbCl.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">Sin clientes cargados aún.</td></tr>';
       } else {
         tbCl.innerHTML = data.clientes.map(c => 
-          `<tr><td class="p-2 font-bold text-slate-400">#${c.id}</td><td class="p-2 text-white">${c.nombre}</td><td class="p-2 text-slate-400">${c.email}</td></tr>`
+          `<tr>
+            <td class="p-2 font-bold text-slate-400">#${c.id}</td>
+            <td class="p-2 text-white font-medium">${c.nombre}</td>
+            <td class="p-2 text-indigo-300 font-bold">${c.dni}</td>
+            <td class="p-2 text-slate-400">${c.email}</td>
+          </tr>`
         ).join('');
       }
 
@@ -461,21 +499,26 @@ HTML_TEMPLATE = """
           `<tr class="hover:bg-slate-800/40">
             <td class="p-2 font-bold text-emerald-400">Ticket N° ${t.numero}</td>
             <td class="p-2 text-white">${t.evento}</td>
-            <td class="p-2">${t.cliente}</td>
+            <td class="p-2 text-slate-300">${t.cliente}</td>
             <td class="p-2 font-bold text-indigo-300">$${t.precio.toFixed(2)}</td>
           </tr>`
         ).join('');
       }
     }
 
-    // 1. Guardar Cliente con Detección de Duplicados
+    // 1. Guardar Cliente con DNI y Control de Duplicados
     async function guardarCliente(e, forzar = false) {
       if (e) e.preventDefault();
       const nombre = document.getElementById('cli-nombre').value;
+      const dni = document.getElementById('cli-dni').value;
       const email = document.getElementById('cli-email').value;
 
       if (!nombre.trim()) {
         mostrarModalAlerta("Te falta el Nombre y Apellido del cliente.");
+        return;
+      }
+      if (!dni.trim()) {
+        mostrarModalAlerta("Te falta el DNI (Documento) del cliente.");
         return;
       }
       if (!email.trim()) {
@@ -486,18 +529,19 @@ HTML_TEMPLATE = """
       const res = await fetch('/api/cliente', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ nombre, email, forzar })
+        body: JSON.stringify({ nombre, dni, email, forzar })
       });
       const data = await res.json();
 
       if (data.status === 'ok') {
         mostrarModalAlerta(data.mensaje, "¡Cliente registrado!", false);
         document.getElementById('cli-nombre').value = '';
+        document.getElementById('cli-dni').value = '';
         document.getElementById('cli-email').value = '';
         actualizarPantalla();
       } else if (data.status === 'duplicado') {
         solicitarConfirmacion(
-          `El cliente con email '${email}' ya se encuentra registrado. ¿Estás seguro de registrarlo de todos modos?`,
+          `El cliente con DNI '${dni}' ya se encuentra registrado. ¿Estás seguro de registrarlo de todos modos?`,
           () => guardarCliente(null, true)
         );
       } else {
@@ -544,7 +588,7 @@ HTML_TEMPLATE = """
       }
     }
 
-    // 3. Emitir Entrada con Detección de Entrada Previa para el mismo Evento
+    // 3. Emitir Entrada
     async function emitirEntrada(e, forzar = false) {
       if (e) e.preventDefault();
       const evento_id = document.getElementById('sel-evento').value;
@@ -604,7 +648,7 @@ HTML_TEMPLATE = """
 """
 
 # ==============================================================================
-# 6. RUTAS API (Backend con detección de duplicados)
+# 6. RUTAS API (Backend con soporte para DNI)
 # ==============================================================================
 @app.route("/")
 def index():
@@ -615,8 +659,8 @@ def obtener_datos():
     conn = sqlite3.connect("ticketera.db")
     cur = conn.cursor()
 
-    cur.execute("SELECT id, nombre, email FROM clientes ORDER BY id DESC")
-    clientes = [{"id": r[0], "nombre": r[1], "email": r[2]} for r in cur.fetchall()]
+    cur.execute("SELECT id, nombre, dni, email FROM clientes ORDER BY id DESC")
+    clientes = [{"id": r[0], "nombre": r[1], "dni": r[2], "email": r[3]} for r in cur.fetchall()]
 
     cur.execute("SELECT id, nombre, sala, cupo_maximo, tipo FROM eventos ORDER BY id DESC")
     eventos = []
@@ -626,7 +670,7 @@ def obtener_datos():
         eventos.append({"id": r[0], "nombre": r[1], "sala": r[2], "cupo_maximo": r[3], "tipo": r[4], "vendidas": vendidas})
 
     cur.execute("""
-        SELECT e.numero, ev.nombre, c.nombre, e.precio 
+        SELECT e.numero, ev.nombre, c.nombre || ' (DNI: ' || c.dni || ')', e.precio 
         FROM entradas e
         JOIN eventos ev ON e.evento_id = ev.id
         JOIN clientes c ON e.cliente_id = c.id
@@ -641,26 +685,28 @@ def obtener_datos():
 def crear_cliente():
     data = request.json
     nombre = data.get("nombre", "")
+    dni = data.get("dni", "")
     email = data.get("email", "")
     forzar = data.get("forzar", False)
 
     try:
-        cliente_obj = Cliente(0, nombre, email)
+        cliente_obj = Cliente(0, nombre, dni, email)
         
         conn = sqlite3.connect("ticketera.db")
         cur = conn.cursor()
 
-        # Detección de duplicado por email
+        # Detección de duplicado por DNI
         if not forzar:
-            cur.execute("SELECT COUNT(*) FROM clientes WHERE LOWER(email) = LOWER(?)", (cliente_obj.email,))
+            cur.execute("SELECT COUNT(*) FROM clientes WHERE dni = ?", (cliente_obj.dni,))
             if cur.fetchone()[0] > 0:
                 conn.close()
-                return jsonify({"status": "duplicado", "mensaje": "Cliente ya registrado."})
+                return jsonify({"status": "duplicado", "mensaje": "Cliente con este DNI ya registrado."})
 
-        cur.execute("INSERT INTO clientes (nombre, email) VALUES (?, ?)", (cliente_obj.nombre, cliente_obj.email))
+        cur.execute("INSERT INTO clientes (nombre, dni, email) VALUES (?, ?, ?)", 
+                    (cliente_obj.nombre, cliente_obj.dni, cliente_obj.email))
         conn.commit()
         conn.close()
-        return jsonify({"status": "ok", "mensaje": f"Cliente '{cliente_obj.nombre}' guardado correctamente en la base de datos."})
+        return jsonify({"status": "ok", "mensaje": f"Cliente '{cliente_obj.nombre}' (DNI: {cliente_obj.dni}) guardado correctamente en la BD."})
     except DatoInvalidoError as err:
         return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": str(err)})
 
@@ -702,12 +748,12 @@ def vender():
     conn = sqlite3.connect("ticketera.db")
     cur = conn.cursor()
 
-    cur.execute("SELECT nombre, email FROM clientes WHERE id = ?", (cl_id,))
+    cur.execute("SELECT nombre, dni, email FROM clientes WHERE id = ?", (cl_id,))
     c_row = cur.fetchone()
     if not c_row:
         conn.close()
         return jsonify({"status": "error", "tipo": "DatoInvalidoError", "mensaje": "El cliente seleccionado no existe."})
-    cliente_obj = Cliente(cl_id, c_row[0], c_row[1])
+    cliente_obj = Cliente(cl_id, c_row[0], c_row[1], c_row[2])
 
     cur.execute("SELECT nombre, sala, cupo_maximo, tipo FROM eventos WHERE id = ?", (ev_id,))
     e_row = cur.fetchone()
@@ -725,14 +771,14 @@ def vender():
     for t_row in cur.fetchall():
         evento_obj.entradas_vendidas.append(Entrada(t_row[0], evento_obj, cliente_obj, t_row[1]))
 
-    # Verificación de entrada duplicada para el mismo cliente en este evento
+    # Verificación de entrada duplicada
     if not forzar:
         cur.execute("SELECT COUNT(*) FROM entradas WHERE evento_id = ? AND cliente_id = ?", (ev_id, cl_id))
         if cur.fetchone()[0] > 0:
             conn.close()
             return jsonify({
                 "status": "duplicado", 
-                "mensaje": f"El cliente {cliente_obj.nombre} ya tiene una entrada registrada para '{evento_obj.nombre}'. ¿Estás seguro de emitirle otra entrada duplicada?"
+                "mensaje": f"El cliente {cliente_obj.nombre} (DNI: {cliente_obj.dni}) ya posee una entrada para '{evento_obj.nombre}'. ¿Estás seguro de emitirle otra entrada duplicada?"
             })
 
     try:
@@ -747,7 +793,7 @@ def vender():
         conn.close()
         return jsonify({
             "status": "ok", 
-            "mensaje": f"Ticket N° {ticket.numero} emitido para {cliente_obj.nombre} en '{evento_obj.nombre}'. Importe final: ${ticket.precio:.2f}"
+            "mensaje": f"Ticket N° {ticket.numero} emitido para {cliente_obj.nombre} (DNI: {cliente_obj.dni}) en '{evento_obj.nombre}'. Importe final: ${ticket.precio:.2f}"
         })
     except (DatoInvalidoError, EntradaInvalidaError) as err:
         conn.close()
